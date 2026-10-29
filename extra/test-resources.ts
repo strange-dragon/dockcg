@@ -3,7 +3,7 @@
  *
  * What it does:
  *   1. deploys a real Caddy compose stack into a temporary stacks dir,
- *   2. boots a real Dockge server against a temporary data dir,
+ *   2. boots a real Dockcg server against a temporary data dir,
  *   3. logs in over socket.io exactly like the frontend does and calls the
  *      same agent events the Resources pages use,
  *   4. asserts the inventory attributes the stack correctly and that cleanup
@@ -18,7 +18,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { io, Socket } from "socket.io-client";
-import { DockgeServer } from "../backend/dockge-server";
+import { DockcgServer } from "../backend/dockcg-server";
 import {
     DockerImageInfo,
     DockerNetworkInfo,
@@ -31,18 +31,18 @@ const PORT = 5098;
 const STACK_NAME = "caddy-e2e";
 const CADDY_PORT = 18081;
 const REGISTRY_PORT = 5555;
-const REGISTRY_CONTAINER = "dockge-e2e-registry";
+const REGISTRY_CONTAINER = "dockcg-e2e-registry";
 const USERNAME = "e2e";
 const PASSWORD = "e2ePassword123";
 
-const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dockge-e2e-"));
+const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dockcg-e2e-"));
 const dataDir = path.join(tmpRoot, "data");
 const stacksDir = path.join(tmpRoot, "stacks");
 const stackDir = path.join(stacksDir, STACK_NAME);
 
-process.env.DOCKGE_DATA_DIR = dataDir;
-process.env.DOCKGE_STACKS_DIR = stacksDir;
-process.env.DOCKGE_PORT = String(PORT);
+process.env.DOCKCG_DATA_DIR = dataDir;
+process.env.DOCKCG_STACKS_DIR = stacksDir;
+process.env.DOCKCG_PORT = String(PORT);
 
 interface RegistryJson {
     id : number;
@@ -153,7 +153,7 @@ volumes:
   caddy_data:
 `);
     fs.writeFileSync(path.join(stackDir, "Caddyfile"), `:80 {
-    respond "hello from dockge e2e"
+    respond "hello from dockcg e2e"
 }
 `);
 
@@ -161,7 +161,7 @@ volumes:
     await sh("docker", [ "compose", "up", "-d" ], stackDir);
     await waitFor("caddy to answer on its published port", 120000, async () => {
         const res = await fetch(`http://127.0.0.1:${CADDY_PORT}/`);
-        return res.ok && (await res.text()).includes("dockge e2e");
+        return res.ok && (await res.text()).includes("dockcg e2e");
     });
     ok("caddy stack is serving traffic", `port ${CADDY_PORT}`);
 
@@ -174,15 +174,15 @@ volumes:
     ok("local registry is up", `port ${REGISTRY_PORT}`);
 
     // ------------------------------------------------------------------ server
-    section("boot dockge and log in over socket.io");
-    const server = new DockgeServer();
+    section("boot dockcg and log in over socket.io");
+    const server = new DockcgServer();
     await server.serve();
 
-    await waitFor("dockge http", 60000, async () => {
+    await waitFor("dockcg http", 60000, async () => {
         const res = await fetch(`http://127.0.0.1:${PORT}/`);
         return res.status === 200;
     });
-    ok("dockge is listening", `port ${PORT}`);
+    ok("dockcg is listening", `port ${PORT}`);
 
     const socket = io(`http://127.0.0.1:${PORT}`, {
         transports: [ "websocket" ],
@@ -319,16 +319,16 @@ volumes:
         !(pruneImagesBusy.removed || []).some((name) => name.includes("caddy")), JSON.stringify(pruneImagesBusy.removed));
 
     // orphan resources created outside compose must be reclaimable
-    await sh("docker", [ "volume", "create", "dockge-e2e-orphan" ]);
-    await sh("docker", [ "network", "create", "dockge-e2e-orphan-net" ]);
+    await sh("docker", [ "volume", "create", "dockcg-e2e-orphan" ]);
+    await sh("docker", [ "network", "create", "dockcg-e2e-orphan-net" ]);
 
     const pruneOrphanVolumes = await agent("pruneDockerVolumes", false);
     assert("prune removes an orphan volume",
-        (pruneOrphanVolumes.removed || []).includes("dockge-e2e-orphan"), JSON.stringify(pruneOrphanVolumes.removed));
+        (pruneOrphanVolumes.removed || []).includes("dockcg-e2e-orphan"), JSON.stringify(pruneOrphanVolumes.removed));
 
     const pruneOrphanNetworks = await agent("pruneDockerNetworks", false);
     assert("prune removes an orphan network",
-        (pruneOrphanNetworks.removed || []).includes("dockge-e2e-orphan-net"), JSON.stringify(pruneOrphanNetworks.removed));
+        (pruneOrphanNetworks.removed || []).includes("dockcg-e2e-orphan-net"), JSON.stringify(pruneOrphanNetworks.removed));
 
     // --------------------------------------------------------- after stack down
     section("cleanup safety (stack stopped)");

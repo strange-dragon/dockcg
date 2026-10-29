@@ -2,7 +2,7 @@ import crypto from "crypto";
 
 /**
  * Small AES-256-GCM helper used to keep registry credentials unreadable at rest.
- * The key is derived from the Dockge instance JWT secret, which never leaves the data directory.
+ * The key is derived from the Dockcg instance JWT secret, which never leaves the data directory.
  */
 
 const ALGORITHM = "aes-256-gcm";

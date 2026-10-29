@@ -1,8 +1,8 @@
-import { DockgeServer } from "./dockge-server";
+import { DockcgServer } from "./dockcg-server";
 import fs, { promises as fsAsync } from "fs";
 import { log } from "./log";
 import yaml from "yaml";
-import { DockgeSocket, fileExists, ValidationError } from "./util-server";
+import { DockcgSocket, fileExists, ValidationError } from "./util-server";
 import path from "path";
 import {
     acceptedComposeFileNames,
@@ -28,13 +28,13 @@ export class Stack {
     protected _composeENV?: string;
     protected _configFilePath?: string;
     protected _composeFileName: string = "compose.yaml";
-    protected server: DockgeServer;
+    protected server: DockcgServer;
 
     protected combinedTerminal? : Terminal;
 
     protected static managedStackList: Map<string, Stack> = new Map();
 
-    constructor(server : DockgeServer, name : string, composeYAML? : string, composeENV? : string, skipFSOperations = false) {
+    constructor(server : DockcgServer, name : string, composeYAML? : string, composeENV? : string, skipFSOperations = false) {
         this.name = name;
         this.server = server;
         this._composeYAML = composeYAML;
@@ -83,7 +83,7 @@ export class Stack {
             name: this.name,
             status: this._status,
             tags: [],
-            isManagedByDockge: this.isManagedByDockge,
+            isManagedByDockcg: this.isManagedByDockcg,
             composeFileName: this._composeFileName,
             endpoint,
         };
@@ -103,7 +103,7 @@ export class Stack {
         return JSON.parse(res.stdout.toString());
     }
 
-    get isManagedByDockge() : boolean {
+    get isManagedByDockcg() : boolean {
         return fs.existsSync(this.path) && fs.statSync(this.path).isDirectory();
     }
 
@@ -204,7 +204,7 @@ export class Stack {
         }
     }
 
-    async deploy(socket : DockgeSocket) : Promise<number> {
+    async deploy(socket : DockcgSocket) : Promise<number> {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("up", "-d", "--remove-orphans"), this.path);
         if (exitCode !== 0) {
@@ -213,7 +213,7 @@ export class Stack {
         return exitCode;
     }
 
-    async delete(socket: DockgeSocket) : Promise<number> {
+    async delete(socket: DockcgSocket) : Promise<number> {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("down", "--remove-orphans"), this.path);
         if (exitCode !== 0) {
@@ -260,7 +260,7 @@ export class Stack {
         return false;
     }
 
-    static async getStackList(server : DockgeServer, useCacheForManaged = false) : Promise<Map<string, Stack>> {
+    static async getStackList(server : DockcgServer, useCacheForManaged = false) : Promise<Map<string, Stack>> {
         let stacksDir = server.stacksDir;
         let stackList : Map<string, Stack>;
 
@@ -312,10 +312,10 @@ export class Stack {
         for (let composeStack of composeList) {
             let stack = stackList.get(composeStack.Name);
 
-            // This stack probably is not managed by Dockge, but we still want to show it
+            // This stack probably is not managed by Dockcg, but we still want to show it
             if (!stack) {
-                // Skip the dockge stack if it is not managed by Dockge
-                if (composeStack.Name === "dockge") {
+                // Skip the dockcg stack if it is not managed by Dockcg
+                if (composeStack.Name === "dockcg") {
                     continue;
                 }
                 stack = new Stack(server, composeStack.Name);
@@ -372,7 +372,7 @@ export class Stack {
         }
     }
 
-    static async getStack(server: DockgeServer, stackName: string, skipFSOperations = false) : Promise<Stack> {
+    static async getStack(server: DockcgServer, stackName: string, skipFSOperations = false) : Promise<Stack> {
         let dir = path.join(server.stacksDir, stackName);
 
         if (!skipFSOperations) {
@@ -418,7 +418,7 @@ export class Stack {
         return options;
     }
 
-    async start(socket: DockgeSocket) {
+    async start(socket: DockcgSocket) {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("up", "-d", "--remove-orphans"), this.path);
         if (exitCode !== 0) {
@@ -427,7 +427,7 @@ export class Stack {
         return exitCode;
     }
 
-    async stop(socket: DockgeSocket) : Promise<number> {
+    async stop(socket: DockcgSocket) : Promise<number> {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("stop"), this.path);
         if (exitCode !== 0) {
@@ -436,7 +436,7 @@ export class Stack {
         return exitCode;
     }
 
-    async restart(socket: DockgeSocket) : Promise<number> {
+    async restart(socket: DockcgSocket) : Promise<number> {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("restart"), this.path);
         if (exitCode !== 0) {
@@ -445,7 +445,7 @@ export class Stack {
         return exitCode;
     }
 
-    async down(socket: DockgeSocket) : Promise<number> {
+    async down(socket: DockcgSocket) : Promise<number> {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("down"), this.path);
         if (exitCode !== 0) {
@@ -454,7 +454,7 @@ export class Stack {
         return exitCode;
     }
 
-    async update(socket: DockgeSocket) {
+    async update(socket: DockcgSocket) {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         let exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", this.getComposeOptions("pull"), this.path);
         if (exitCode !== 0) {
@@ -475,7 +475,7 @@ export class Stack {
         return exitCode;
     }
 
-    async joinCombinedTerminal(socket: DockgeSocket) {
+    async joinCombinedTerminal(socket: DockcgSocket) {
         const terminalName = getCombinedTerminalName(socket.endpoint, this.name);
         const terminal = Terminal.getOrCreateTerminal(this.server, terminalName, "docker", this.getComposeOptions("logs", "-f", "--tail", "100"), this.path);
         terminal.enableKeepAlive = true;
@@ -485,7 +485,7 @@ export class Stack {
         terminal.start();
     }
 
-    async leaveCombinedTerminal(socket: DockgeSocket) {
+    async leaveCombinedTerminal(socket: DockcgSocket) {
         const terminalName = getCombinedTerminalName(socket.endpoint, this.name);
         const terminal = Terminal.getTerminal(terminalName);
         if (terminal) {
@@ -493,7 +493,7 @@ export class Stack {
         }
     }
 
-    async joinContainerTerminal(socket: DockgeSocket, serviceName: string, shell : string = "sh", index: number = 0) {
+    async joinContainerTerminal(socket: DockcgSocket, serviceName: string, shell : string = "sh", index: number = 0) {
         const terminalName = getContainerExecTerminalName(socket.endpoint, this.name, serviceName, index);
         let terminal = Terminal.getTerminal(terminalName);
 
@@ -551,7 +551,7 @@ export class Stack {
         }
     }
 
-    async startService(socket: DockgeSocket, serviceName: string) {
+    async startService(socket: DockcgSocket, serviceName: string) {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         const exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "compose", "up", "-d", serviceName ], this.path);
         if (exitCode !== 0) {
@@ -561,7 +561,7 @@ export class Stack {
         return exitCode;
     }
 
-    async stopService(socket: DockgeSocket, serviceName: string): Promise<number> {
+    async stopService(socket: DockcgSocket, serviceName: string): Promise<number> {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         const exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "compose", "stop", serviceName ], this.path);
         if (exitCode !== 0) {
@@ -571,7 +571,7 @@ export class Stack {
         return exitCode;
     }
 
-    async restartService(socket: DockgeSocket, serviceName: string): Promise<number> {
+    async restartService(socket: DockcgSocket, serviceName: string): Promise<number> {
         const terminalName = getComposeTerminalName(socket.endpoint, this.name);
         const exitCode = await Terminal.exec(this.server, socket, terminalName, "docker", [ "compose", "restart", serviceName ], this.path);
         if (exitCode !== 0) {

@@ -1,6 +1,11 @@
 services:
-  dockge:
-    image: louislam/dockge:1
+  dockcg:
+    image: strange-dragon/dockcg:1
+    # Not published yet - build locally with: docker compose up -d --build
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: release
     restart: unless-stopped
     ports:
       # Host Port : Container Port
@@ -9,7 +14,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
         
-      # If you want to use private registries, you need to share the auth file with Dockge:
+      # If you want to use private registries, you need to share the auth file with Dockcg:
       # - /root/.docker/:/root/.docker
 
       # Stacks Directory
@@ -18,5 +23,5 @@ services:
       # ⚠️ 2. Left Stacks Path === Right Stacks Path (MUST)
       - /opt/stacks:/opt/stacks
     environment:
-      # Tell Dockge where is your stacks directory
-      - DOCKGE_STACKS_DIR=/opt/stacks
+      # Tell Dockcg where is your stacks directory
+      - DOCKCG_STACKS_DIR=/opt/stacks

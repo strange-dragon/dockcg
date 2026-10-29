@@ -66,14 +66,14 @@ export default {
             if (this.objectType === "service") {
                 // Used in Container.vue
                 return this.$parent.$parent.service;
-            } else if (this.objectType === "x-dockge") {
+            } else if (this.objectType === "x-dockcg") {
 
-                if (!this.$parent.$parent.jsonConfig["x-dockge"]) {
+                if (!this.$parent.$parent.jsonConfig["x-dockcg"]) {
                     return {};
                 }
 
                 // Used in Compose.vue
-                return this.$parent.$parent.jsonConfig["x-dockge"];
+                return this.$parent.$parent.jsonConfig["x-dockcg"];
             } else {
                 return {};
             }
@@ -102,9 +102,9 @@ export default {
         addField() {
 
             // Create the object if not exists.
-            if (this.objectType === "x-dockge") {
-                if (!this.$parent.$parent.jsonConfig["x-dockge"]) {
-                    this.$parent.$parent.jsonConfig["x-dockge"] = {};
+            if (this.objectType === "x-dockcg") {
+                if (!this.$parent.$parent.jsonConfig["x-dockcg"]) {
+                    this.$parent.$parent.jsonConfig["x-dockcg"] = {};
                 }
             }
 

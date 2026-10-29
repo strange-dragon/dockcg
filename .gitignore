@@ -10,3 +10,7 @@ tmp
 # Git only
 frontend-dist
 
+# Local design mockups / assistant notes
+extra/ui-preview.html
+.workbuddy/
+

@@ -1,9 +1,9 @@
-import { DockgeServer } from "../dockge-server";
+import { DockcgServer } from "../dockcg-server";
 import { Router } from "../router";
 import express, { Express, Router as ExpressRouter } from "express";
 
 export class MainRouter extends Router {
-    create(app: Express, server: DockgeServer): ExpressRouter {
+    create(app: Express, server: DockcgServer): ExpressRouter {
         const router = express.Router();
 
         router.get("/", (req, res) => {

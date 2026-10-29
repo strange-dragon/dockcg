@@ -2,11 +2,20 @@
     <img src="./frontend/public/icon.svg" width="128" alt="" />
 </div>
 
-# Dockge
+# Dockcg
 
 A fancy, easy-to-use and reactive self-hosted docker compose.yaml stack-oriented manager.
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/louislam/dockge?logo=github&style=flat)](https://github.com/louislam/dockge) [![Docker Pulls](https://img.shields.io/docker/pulls/louislam/dockge?logo=docker)](https://hub.docker.com/r/louislam/dockge/tags) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/louislam/dockge/latest?label=docker%20image%20ver.)](https://hub.docker.com/r/louislam/dockge/tags) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/louislam/dockge/master?logo=github)](https://github.com/louislam/dockge/commits/master/)
+> **About this fork** — Dockcg is a personal fork of [Dockge](https://github.com/louislam/dockge), so all credit for the original goes upstream. On top of the compose-only workflow it adds a **System Resources** section (Images / Volumes / Networks / private Registries). Containers are still 100% managed by `compose.yaml`; nothing here can run a standalone container.
+>
+> The image under `strange-dragon/dockcg` is **not published yet**, so build it yourself:
+> ```bash
+> docker compose up -d --build          # uses the build section in compose.yaml
+> # or
+> docker build -f docker/Dockerfile --target release -t strange-dragon/dockcg:1 .
+> ```
+
+[![GitHub Repo stars](https://img.shields.io/github/stars/strange-dragon/dockcg?logo=github&style=flat)](https://github.com/strange-dragon/dockcg) [![Docker Pulls](https://img.shields.io/docker/pulls/strange-dragon/dockcg?logo=docker)](https://hub.docker.com/r/strange-dragon/dockcg/tags) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/strange-dragon/dockcg/latest?label=docker%20image%20ver.)](https://hub.docker.com/r/strange-dragon/dockcg/tags) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/strange-dragon/dockcg/master?logo=github)](https://github.com/strange-dragon/dockcg/commits/master/)
 
 <img src="https://github.com/louislam/dockge/assets/1336778/26a583e1-ecb1-4a8d-aedf-76157d714ad7" width="900" alt="" />
 
@@ -21,7 +30,7 @@ View Video: https://youtu.be/AWAlOQeNpgU?t=48
 - 🦦 Interactive Web Terminal
 - 🕷️ (1.4.0 🆕) Multiple agents support - You can manage multiple stacks from different Docker hosts in one single interface
 - 🏪 Convert `docker run ...` commands into `compose.yaml`
-- 📙 File based structure - Dockge won't kidnap your compose files, they are stored on your drive as usual. You can interact with them using normal `docker compose` commands
+- 📙 File based structure - Dockcg won't kidnap your compose files, they are stored on your drive as usual. You can interact with them using normal `docker compose` commands
 
 <img src="https://github.com/louislam/dockge/assets/1336778/cc071864-592e-4909-b73a-343a57494002" width=300 />
 
@@ -53,12 +62,12 @@ Requirements:
 - Default Port: 5001
 
 ```
-# Create directories that store your stacks and stores Dockge's stack
-mkdir -p /opt/stacks /opt/dockge
-cd /opt/dockge
+# Create directories that store your stacks and stores Dockcg's stack
+mkdir -p /opt/stacks /opt/dockcg
+cd /opt/dockcg
 
 # Download the compose.yaml
-curl https://raw.githubusercontent.com/louislam/dockge/master/compose.yaml --output compose.yaml
+curl https://raw.githubusercontent.com/strange-dragon/dockcg/master/compose.yaml --output compose.yaml
 
 # Start the server
 docker compose up -d
@@ -67,21 +76,13 @@ docker compose up -d
 # docker-compose up -d
 ```
 
-Dockge is now running on http://localhost:5001
+Dockcg is now running on http://localhost:5001
 
 ### Advanced
 
-If you want to store your stacks in another directory, you can generate your compose.yaml file by using the following URL with custom query strings.
+If you want to store your stacks in another directory, edit the `DOCKCG_STACKS_DIR` environment variable and the volume mount in `compose.yaml` directly.
 
-```
-# Download your compose.yaml
-curl "https://dockge.kuma.pet/compose.yaml?port=5001&stacksPath=/opt/stacks" --output compose.yaml
-```
-
-- port=`5001`
-- stacksPath=`/opt/stacks`
-
-Also, once compose is generated/downloaded, add the `PUID` and `PGID` section below to your compose `environment:` section to set stack ownership, otherwise default is `root`
+Also, add the `PUID` and `PGID` section below to your compose `environment:` section to set stack ownership, otherwise default is `root`
 
 ```
       # Both PUID and PGID must be set for it to do anything
@@ -89,19 +90,16 @@ Also, once compose is generated/downloaded, add the `PUID` and `PGID` section be
       - PGID=1000 # Set the stack file/dir ownership to this group
 ```
 
-Interactive compose.yaml generator is available on: 
-https://dockge.kuma.pet
-
 ### -OR-
 Copy and paste your compose from the following:
 
-If you want to store your stacks in another directory, you can change the `DOCKGE_STACKS_DIR` environment variable and volumes.
+If you want to store your stacks in another directory, you can change the `DOCKCG_STACKS_DIR` environment variable and volumes.
 
 compose:
 ```
 services:
-  dockge:
-    image: louislam/dockge:1
+  dockcg:
+    image: strange-dragon/dockcg:1
     restart: unless-stopped
     ports:
       # Host Port:Container Port
@@ -110,7 +108,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
         
-      # If you want to use private registries, you need to share the auth file with Dockge:
+      # If you want to use private registries, you need to share the auth file with Dockcg:
       # - /root/.docker/:/root/.docker
 
       # Stacks Directory
@@ -120,8 +118,8 @@ services:
       # ❌ WRONG EXAMPLE: - /docker:/my-stacks (Both paths do not match)
       - /opt/stacks:/opt/stacks
     environment:
-      # Tell Dockge where your stacks directory is
-      - DOCKGE_STACKS_DIR=/opt/stacks
+      # Tell Dockcg where your stacks directory is
+      - DOCKCG_STACKS_DIR=/opt/stacks
       # Both PUID and PGID must be set for it to do anything
       - PUID=1000 # Set the stack file/dir ownership to this user
       - PGID=1000 # Set the stack file/dir ownership to this group
@@ -130,7 +128,7 @@ services:
 ## How to Update
 
 ```bash
-cd /opt/dockge
+cd /opt/dockcg
 docker compose pull && docker compose up -d
 ```
 
@@ -157,29 +155,29 @@ If you love this project, please consider giving it a ⭐.
 ## 🗣️ Community and Contribution
 
 ### Bug Report
-https://github.com/louislam/dockge/issues
+https://github.com/strange-dragon/dockcg/issues
 
 ### Ask for Help / Discussions
-https://github.com/louislam/dockge/discussions
+https://github.com/strange-dragon/dockcg/discussions
 
 ### Translation
-If you want to translate Dockge into your language, please read [Translation Guide](https://github.com/louislam/dockge/blob/master/frontend/src/lang/README.md)
+If you want to translate Dockcg into your language, please read [Translation Guide](https://github.com/strange-dragon/dockcg/blob/master/frontend/src/lang/README.md)
 
 ### Create a Pull Request
 
-Be sure to read the [guide](https://github.com/louislam/dockge/blob/master/CONTRIBUTING.md), as we don't accept all types of pull requests and don't want to waste your time.
+Be sure to read the [guide](https://github.com/strange-dragon/dockcg/blob/master/CONTRIBUTING.md), as we don't accept all types of pull requests and don't want to waste your time.
 
 ## FAQ
 
-#### "Dockge"?
+#### "Dockcg"?
 
-"Dockge" is a coinage word which is created by myself. I originally hoped it sounds like `Dodge`, but apparently many people called it `Dockage`, it is also acceptable.
+"Dockcg" is a coinage word which is created by myself. I originally hoped it sounds like `Dodge`, but apparently many people called it `Dockage`, it is also acceptable.
 
 The naming idea came from Twitch emotes like `sadge`, `bedge` or `wokege`. They all end in `-ge`.
 
 #### Can I manage a single container without `compose.yaml`?
 
-The main objective of Dockge is to try to use the docker `compose.yaml` for everything. If you want to manage a single container, you can just use Portainer or Docker CLI.
+The main objective of Dockcg is to try to use the docker `compose.yaml` for everything. If you want to manage a single container, you can just use Portainer or Docker CLI.
 
 #### Can I manage existing stacks?
 
@@ -187,21 +185,21 @@ Yes, you can. However, you need to move your compose file into the stacks direct
 
 1. Stop your stack
 2. Move your compose file into `/opt/stacks/<stackName>/compose.yaml`
-3. In Dockge, click the " Scan Stacks Folder" button in the top-right corner's dropdown menu
+3. In Dockcg, click the " Scan Stacks Folder" button in the top-right corner's dropdown menu
 4. Now you should see your stack in the list
 
-#### Is Dockge a Portainer replacement?
+#### Is Dockcg a Portainer replacement?
 
-Yes or no. Portainer provides a lot of Docker features. While Dockge is currently only focusing on docker-compose with a better user interface and better user experience.
+Yes or no. Portainer provides a lot of Docker features. While Dockcg is currently only focusing on docker-compose with a better user interface and better user experience.
 
 If you want to manage your container with docker-compose only, the answer may be yes.
 
 If you still need to manage something like docker networks, single containers, the answer may be no.
 
-#### Can I install both Dockge and Portainer?
+#### Can I install both Dockcg and Portainer?
 
 Yes, you can.
 
 ## Others
 
-Dockge is built on top of [Compose V2](https://docs.docker.com/compose/migrate/). `compose.yaml`  also known as `docker-compose.yml`.
+Dockcg is built on top of [Compose V2](https://docs.docker.com/compose/migrate/). `compose.yaml`  also known as `docker-compose.yml`.

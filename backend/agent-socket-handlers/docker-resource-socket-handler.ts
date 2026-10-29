@@ -1,6 +1,6 @@
 import { AgentSocketHandler } from "../agent-socket-handler";
-import { DockgeServer } from "../dockge-server";
-import { callbackError, callbackResult, checkLogin, DockgeSocket, ValidationError } from "../util-server";
+import { DockcgServer } from "../dockcg-server";
+import { callbackError, callbackResult, checkLogin, DockcgSocket, ValidationError } from "../util-server";
 import { AgentSocket } from "../../common/agent-socket";
 import { getImagePullTerminalName } from "../../common/util-common";
 import { Terminal } from "../terminal";
@@ -45,10 +45,10 @@ function requireBoolean(value : unknown, fieldName : string) : boolean {
  * plus private registry credentials.
  *
  * This handler runs on the instance that owns the docker daemon, so it also
- * works transparently through Dockge agents.
+ * works transparently through Dockcg agents.
  */
 export class DockerResourceSocketHandler extends AgentSocketHandler {
-    create(socket : DockgeSocket, server : DockgeServer, agentSocket : AgentSocket) {
+    create(socket : DockcgSocket, server : DockcgServer, agentSocket : AgentSocket) {
         // Do not call super.create()
 
         // ***************************

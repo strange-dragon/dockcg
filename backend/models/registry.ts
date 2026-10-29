@@ -5,7 +5,7 @@ import { LooseObject } from "../../common/util-common";
 export class Registry extends BeanModel {
 
     /**
-     * All registries of this Dockge instance, oldest first.
+     * All registries of this Dockcg instance, oldest first.
      *
      * redbean prepends its own `where` fragment, so an empty clause is used
      * here and the ordering is applied in memory (same style as agent.ts).

@@ -1,7 +1,7 @@
 import { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
-    // Registry credentials. One registry list per Dockge instance,
+    // Registry credentials. One registry list per Dockcg instance,
     // because docker credentials live in the docker daemon's config anyway.
     return knex.schema.createTable("registry", (table) => {
         table.increments("id");

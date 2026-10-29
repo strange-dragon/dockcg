@@ -8,7 +8,7 @@ import {
 import { log } from "./log";
 
 /**
- * Dockge resource inventory.
+ * Dockcg resource inventory.
  *
  * Design rules:
  *  - Read only, plus explicit cleanup of nothing-but-unused resources.
@@ -173,7 +173,7 @@ function normalizeDate(value : string | undefined) : string {
 }
 
 /**
- * List all containers (running and stopped) with the compose metadata Dockge needs
+ * List all containers (running and stopped) with the compose metadata Dockcg needs
  * to attribute images / volumes / networks to a stack and a service.
  */
 export async function listContainers() : Promise<DockerContainerInfo[]> {

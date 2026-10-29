@@ -21,7 +21,7 @@ import { R } from "redbean-node";
 import { genSecret, isDev, LooseObject } from "../common/util-common";
 import { generatePasswordHash } from "./password-hash";
 import { Bean } from "redbean-node/dist/bean";
-import { Arguments, Config, DockgeSocket } from "./util-server";
+import { Arguments, Config, DockcgSocket } from "./util-server";
 import { DockerSocketHandler } from "./agent-socket-handlers/docker-socket-handler";
 import { DockerResourceSocketHandler } from "./agent-socket-handlers/docker-resource-socket-handler";
 import expressStaticGzip from "express-static-gzip";
@@ -39,7 +39,7 @@ import { AgentSocket } from "../common/agent-socket";
 import { ManageAgentSocketHandler } from "./socket-handlers/manage-agent-socket-handler";
 import { Terminal } from "./terminal";
 
-export class DockgeServer {
+export class DockcgServer {
     app : Express;
     httpServer : http.Server;
     packageJSON : PackageJson;
@@ -89,7 +89,7 @@ export class DockgeServer {
         // Catch unexpected errors here
         let unexpectedErrorHandler = (error : unknown) => {
             console.trace(error);
-            console.error("If you keep encountering errors, please report to https://github.com/louislam/dockge");
+            console.error("If you keep encountering errors, please report to https://github.com/strange-dragon/dockcg");
         };
         process.addListener("unhandledRejection", unexpectedErrorHandler);
         process.addListener("uncaughtException", unexpectedErrorHandler);
@@ -149,14 +149,14 @@ export class DockgeServer {
         this.config = args as Config;
 
         // Load from environment variables or default values if args are not set
-        this.config.sslKey = args.sslKey || process.env.DOCKGE_SSL_KEY || undefined;
-        this.config.sslCert = args.sslCert || process.env.DOCKGE_SSL_CERT || undefined;
-        this.config.sslKeyPassphrase = args.sslKeyPassphrase || process.env.DOCKGE_SSL_KEY_PASSPHRASE || undefined;
-        this.config.port = args.port || Number(process.env.DOCKGE_PORT) || 5001;
-        this.config.hostname = args.hostname || process.env.DOCKGE_HOSTNAME || undefined;
-        this.config.dataDir = args.dataDir || process.env.DOCKGE_DATA_DIR || "./data/";
-        this.config.stacksDir = args.stacksDir || process.env.DOCKGE_STACKS_DIR || defaultStacksDir;
-        this.config.enableConsole = args.enableConsole || process.env.DOCKGE_ENABLE_CONSOLE === "true" || false;
+        this.config.sslKey = args.sslKey || process.env.DOCKCG_SSL_KEY || undefined;
+        this.config.sslCert = args.sslCert || process.env.DOCKCG_SSL_CERT || undefined;
+        this.config.sslKeyPassphrase = args.sslKeyPassphrase || process.env.DOCKCG_SSL_KEY_PASSPHRASE || undefined;
+        this.config.port = args.port || Number(process.env.DOCKCG_PORT) || 5001;
+        this.config.hostname = args.hostname || process.env.DOCKCG_HOSTNAME || undefined;
+        this.config.dataDir = args.dataDir || process.env.DOCKCG_DATA_DIR || "./data/";
+        this.config.stacksDir = args.stacksDir || process.env.DOCKCG_STACKS_DIR || defaultStacksDir;
+        this.config.enableConsole = args.enableConsole || process.env.DOCKCG_ENABLE_CONSOLE === "true" || false;
         this.stacksDir = this.config.stacksDir;
 
         log.debug("server", this.config);
@@ -251,39 +251,39 @@ export class DockgeServer {
         });
 
         this.io.on("connection", async (socket: Socket) => {
-            let dockgeSocket = socket as DockgeSocket;
-            dockgeSocket.instanceManager = new AgentManager(dockgeSocket);
-            dockgeSocket.emitAgent = (event : string, ...args : unknown[]) => {
+            let dockcgSocket = socket as DockcgSocket;
+            dockcgSocket.instanceManager = new AgentManager(dockcgSocket);
+            dockcgSocket.emitAgent = (event : string, ...args : unknown[]) => {
                 let obj = args[0];
                 if (typeof(obj) === "object") {
                     let obj2 = obj as LooseObject;
-                    obj2.endpoint = dockgeSocket.endpoint;
+                    obj2.endpoint = dockcgSocket.endpoint;
                 }
-                dockgeSocket.emit("agent", event, ...args);
+                dockcgSocket.emit("agent", event, ...args);
             };
 
             if (typeof(socket.request.headers.endpoint) === "string") {
-                dockgeSocket.endpoint = socket.request.headers.endpoint;
+                dockcgSocket.endpoint = socket.request.headers.endpoint;
             } else {
-                dockgeSocket.endpoint = "";
+                dockcgSocket.endpoint = "";
             }
 
-            if (dockgeSocket.endpoint) {
-                log.info("server", "Socket connected (agent), as endpoint " + dockgeSocket.endpoint);
+            if (dockcgSocket.endpoint) {
+                log.info("server", "Socket connected (agent), as endpoint " + dockcgSocket.endpoint);
             } else {
                 log.info("server", "Socket connected (direct)");
             }
 
-            this.sendInfo(dockgeSocket, true);
+            this.sendInfo(dockcgSocket, true);
 
             if (this.needSetup) {
                 log.info("server", "Redirect to setup page");
-                dockgeSocket.emit("setup");
+                dockcgSocket.emit("setup");
             }
 
             // Create socket handlers (original, no agent support)
             for (const socketHandler of this.socketHandlerList) {
-                socketHandler.create(dockgeSocket, this);
+                socketHandler.create(dockcgSocket, this);
             }
 
             // Create Agent Socket
@@ -291,11 +291,11 @@ export class DockgeServer {
 
             // Create agent socket handlers
             for (const socketHandler of this.agentSocketHandlerList) {
-                socketHandler.create(dockgeSocket, this, agentSocket);
+                socketHandler.create(dockcgSocket, this, agentSocket);
             }
 
             // Create agent proxy socket handlers
-            this.agentProxySocketHandler.create2(dockgeSocket, this, agentSocket);
+            this.agentProxySocketHandler.create2(dockcgSocket, this, agentSocket);
 
             // ***************************
             // Better do anything after added all socket handlers here
@@ -304,16 +304,16 @@ export class DockgeServer {
             log.debug("auth", "check auto login");
             if (await Settings.get("disableAuth")) {
                 log.info("auth", "Disabled Auth: auto login to admin");
-                this.afterLogin(dockgeSocket, await R.findOne("user") as User);
-                dockgeSocket.emit("autoLogin");
+                this.afterLogin(dockcgSocket, await R.findOne("user") as User);
+                dockcgSocket.emit("autoLogin");
             } else {
                 log.debug("auth", "need auth");
             }
 
             // Socket disconnect
-            dockgeSocket.on("disconnect", () => {
+            dockcgSocket.on("disconnect", () => {
                 log.info("server", "Socket disconnected!");
-                dockgeSocket.instanceManager.disconnectAll();
+                dockcgSocket.instanceManager.disconnectAll();
             });
 
         });
@@ -329,7 +329,7 @@ export class DockgeServer {
         }
     }
 
-    async afterLogin(socket : DockgeSocket, user : User) {
+    async afterLogin(socket : DockcgSocket, user : User) {
         socket.userID = user.id;
         socket.join(user.id.toString());
 
@@ -343,7 +343,7 @@ export class DockgeServer {
 
         socket.instanceManager.sendAgentList();
 
-        // Also connect to other dockge instances
+        // Also connect to other dockcg instances
         socket.instanceManager.connectAll();
     }
 
@@ -383,7 +383,7 @@ export class DockgeServer {
 
         log.debug("server", "User count: " + userCount);
 
-        // If there is no record in user table, it is a new Dockge instance, need to setup
+        // If there is no record in user table, it is a new Dockcg instance, need to setup
         if (userCount == 0) {
             log.info("server", "No user, need setup");
             this.needSetup = true;
@@ -433,7 +433,7 @@ export class DockgeServer {
         if (!hideVersion) {
             versionProperty = packageJSON.version;
             latestVersionProperty = checkVersion.latestVersion;
-            isContainer = (process.env.DOCKGE_IS_CONTAINER === "1");
+            isContainer = (process.env.DOCKCG_IS_CONTAINER === "1");
         }
 
         socket.emit("info", {
@@ -593,10 +593,10 @@ export class DockgeServer {
         let stackList;
 
         for (let socket of socketList) {
-            let dockgeSocket = socket as DockgeSocket;
+            let dockcgSocket = socket as DockcgSocket;
 
             // Check if the room is a number (user id)
-            if (dockgeSocket.userID) {
+            if (dockcgSocket.userID) {
 
                 // Get the list only if there is a logged in user
                 if (!stackList) {
@@ -606,11 +606,11 @@ export class DockgeServer {
                 let map : Map<string, object> = new Map();
 
                 for (let [ stackName, stack ] of stackList) {
-                    map.set(stackName, stack.toSimpleJSON(dockgeSocket.endpoint));
+                    map.set(stackName, stack.toSimpleJSON(dockcgSocket.endpoint));
                 }
 
-                log.debug("server", "Send stack list to user: " + dockgeSocket.id + " (" + dockgeSocket.endpoint + ")");
-                dockgeSocket.emitAgent("stackList", {
+                log.debug("server", "Send stack list to user: " + dockcgSocket.id + " (" + dockcgSocket.endpoint + ")");
+                dockcgSocket.emitAgent("stackList", {
                     ok: true,
                     stackList: Object.fromEntries(map),
                 });
@@ -702,7 +702,7 @@ export class DockgeServer {
      */
     disconnectAllSocketClients(userID: number | undefined, currentSocketID? : string) {
         for (const rawSocket of this.io.sockets.sockets.values()) {
-            let socket = rawSocket as DockgeSocket;
+            let socket = rawSocket as DockcgSocket;
             if ((!userID || socket.userID === userID) && socket.id !== currentSocketID) {
                 try {
                     socket.emit("refresh");

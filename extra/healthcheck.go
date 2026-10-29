@@ -15,9 +15,9 @@ import (
 )
 
 func main() {
-	// Is K8S + "dockge" as the container name
+	// Is K8S + "dockcg" as the container name
 	// See https://github.com/louislam/uptime-kuma/pull/2083
-	isK8s := strings.HasPrefix(os.Getenv("DOCKGE_PORT"), "tcp://")
+	isK8s := strings.HasPrefix(os.Getenv("DOCKCG_PORT"), "tcp://")
 
 	// process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
@@ -28,18 +28,18 @@ func main() {
 		Timeout: 28 * time.Second,
 	}
 
-	sslKey := os.Getenv("DOCKGE_SSL_KEY")
-	sslCert := os.Getenv("DOCKGE_SSL_CERT")
+	sslKey := os.Getenv("DOCKCG_SSL_KEY")
+	sslCert := os.Getenv("DOCKCG_SSL_CERT")
 
-	hostname := os.Getenv("DOCKGE_HOST")
+	hostname := os.Getenv("DOCKCG_HOST")
 	if len(hostname) == 0 {
 		hostname = "127.0.0.1"
 	}
 
 	port := ""
-	// DOCKGE_PORT is override by K8S unexpectedly,
+	// DOCKCG_PORT is override by K8S unexpectedly,
 	if !isK8s {
-		port = os.Getenv("DOCKGE_PORT")
+		port = os.Getenv("DOCKCG_PORT")
 	}
 	if len(port) == 0 {
 		port = "5001"
