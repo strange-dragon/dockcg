@@ -1,11 +1,10 @@
 name: Nightly Release
 
 on:
-  # fork 里没有 DOCKERHUB_USERNAME / GHCR_TOKEN，定时跑必然失败且白耗额度，
-  # 因此改为仅手动触发。需要 nightly 时手动 Run workflow 即可。
-  # schedule:
-  #   - cron: "0 2 * * *"
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
+  push:
+    branches:
+      - master
 
 permissions: {}
 
@@ -17,8 +16,12 @@ jobs:
       contents: read
       packages: write
 
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/dockcg
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
 
@@ -27,12 +30,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -49,5 +46,17 @@ jobs:
       - name: Install dependencies
         run: npm clean-install --no-fund
 
-      - name: Run release-nightly
-        run: npm run release-nightly
+      - name: Build frontend assets
+        run: npm run build:frontend
+
+      - name: Build and push image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:nightly
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
