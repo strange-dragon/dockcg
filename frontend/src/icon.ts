@@ -60,6 +60,10 @@ import {
     faDatabase,
     faNetworkWired,
     faLayerGroup,
+    faRightLeft,
+    faCodeBranch,
+    faShareNodes,
+    faCircleInfo,
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(
@@ -121,6 +125,10 @@ library.add(
     faDatabase,
     faNetworkWired,
     faLayerGroup,
+    faRightLeft,
+    faCodeBranch,
+    faShareNodes,
+    faCircleInfo,
 );
 
 export { FontAwesomeIcon };

@@ -21,6 +21,13 @@ import {
     removeNetwork,
     removeVolume
 } from "../docker-resources";
+import {
+    connectContainers,
+    createNetwork,
+    createVolume,
+    inspectImage,
+    migrateVolume
+} from "../docker-resource-actions";
 import { log } from "../log";
 
 const IMAGE_REFERENCE_REGEX = /^[A-Za-z0-9][A-Za-z0-9._\-/:@]*$/;
@@ -132,6 +139,18 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             }
         });
 
+        agentSocket.on("getDockerImageDetail", async (imageReference : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const reference = requireString(imageReference, "Image reference");
+                const detail = await inspectImage(reference);
+                callbackResult({ ok: true,
+                    detail }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
         // ***************************
         // Volumes
         // ***************************
@@ -165,6 +184,68 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 const include = requireBoolean(includeCompose, "includeCompose");
                 const result = await pruneVolumes(include);
                 callbackResult({ ok: true,
+                    ...result }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        agentSocket.on("createDockerVolume", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof payload !== "object" || payload === null) {
+                    throw new ValidationError("Invalid volume data");
+                }
+
+                const data = payload as { name? : unknown, driver? : unknown };
+                const driver = typeof data.driver === "string" && data.driver !== "" ? data.driver : "local";
+                const name = await createVolume(requireString(data.name, "Volume name"), driver);
+
+                callbackResult({ ok: true,
+                    msg: `Volume ${name} created`,
+                    name }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        // Migrate copies data between volumes; it never touches compose files, the
+        // user switches compose.yaml over to the new volume afterwards.
+        agentSocket.on("migrateDockerVolume", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof payload !== "object" || payload === null) {
+                    throw new ValidationError("Invalid migration data");
+                }
+
+                const data = payload as {
+                    source? : unknown,
+                    target? : unknown,
+                    keepSource? : unknown,
+                    driver? : unknown,
+                };
+
+                const source = requireString(data.source, "Source volume");
+                const target = requireString(data.target, "Target volume");
+                const keepSource = typeof data.keepSource === "boolean" ? data.keepSource : true;
+                const driver = typeof data.driver === "string" && data.driver !== "" ? data.driver : "local";
+
+                // Refuse while a container still mounts the source: the copy would be inconsistent
+                const containers = await listContainers();
+                const volumes = await listVolumes(containers);
+                const sourceInfo = volumes.find((volume) => volume.name === source);
+
+                if (sourceInfo && sourceInfo.used) {
+                    throw new ValidationError("A container is still mounting this volume. Stop the stack first.");
+                }
+
+                const result = await migrateVolume(source, target, { keepSource,
+                    driver });
+
+                callbackResult({ ok: true,
+                    msg: `Data copied to ${result.target}`,
                     ...result }, callback);
             } catch (e) {
                 callbackError(e, callback);
@@ -225,6 +306,81 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 const include = requireBoolean(includeCompose, "includeCompose");
                 const result = await pruneNetworks(include);
                 callbackResult({ ok: true,
+                    ...result }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        agentSocket.on("createDockerNetwork", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof payload !== "object" || payload === null) {
+                    throw new ValidationError("Invalid network data");
+                }
+
+                const data = payload as { name? : unknown, driver? : unknown, internal? : unknown };
+                const driver = typeof data.driver === "string" && data.driver !== "" ? data.driver : "bridge";
+                const internal = data.internal === true;
+                const name = await createNetwork(requireString(data.name, "Network name"), driver, internal);
+
+                callbackResult({ ok: true,
+                    msg: `Network ${name} created`,
+                    name }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        // Merge attaches the containers of the source networks to the target network.
+        // Containers stay on their original networks, so the merge is additive and
+        // reversible; the compose snippet returned by the client makes it permanent.
+        agentSocket.on("mergeDockerNetworks", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof payload !== "object" || payload === null) {
+                    throw new ValidationError("Invalid merge data");
+                }
+
+                const data = payload as { target? : unknown, sources? : unknown };
+                const target = requireString(data.target, "Target network");
+
+                if (!Array.isArray(data.sources) || data.sources.length === 0) {
+                    throw new ValidationError("Select at least one network to merge");
+                }
+
+                const sources = data.sources
+                    .filter((item) : item is string => typeof item === "string" && item.trim() !== "")
+                    .map((item) => item.trim());
+
+                const containers = await listContainers();
+                const networks = await listNetworks(containers);
+                const containerNames : string[] = [];
+
+                for (const source of sources) {
+                    if (source === target) {
+                        continue;
+                    }
+
+                    const network = networks.find((item) => item.name === source);
+
+                    if (!network) {
+                        continue;
+                    }
+
+                    for (const container of network.containers) {
+                        if (!containerNames.includes(container.name)) {
+                            containerNames.push(container.name);
+                        }
+                    }
+                }
+
+                const result = await connectContainers(target, containerNames);
+
+                callbackResult({ ok: true,
+                    msg: `${result.connected.length} container(s) joined ${target}`,
                     ...result }, callback);
             } catch (e) {
                 callbackError(e, callback);

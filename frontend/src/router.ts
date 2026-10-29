@@ -6,16 +6,15 @@ import Dashboard from "./pages/Dashboard.vue";
 import DashboardHome from "./pages/DashboardHome.vue";
 import Console from "./pages/Console.vue";
 import Compose from "./pages/Compose.vue";
-import Resources from "./pages/Resources.vue";
 import ContainerTerminal from "./pages/ContainerTerminal.vue";
 
 const Settings = () => import("./pages/Settings.vue");
 
-// Resources - Sub Pages
-const ResourcesImages = () => import("./components/resources/Images.vue");
-const ResourcesVolumes = () => import("./components/resources/Volumes.vue");
-const ResourcesNetworks = () => import("./components/resources/Networks.vue");
-const ResourcesRegistries = () => import("./components/resources/Registries.vue");
+// Resources - detail pages (the list itself lives in the sidebar)
+const ImageDetail = () => import("./components/resources/ImageDetail.vue");
+const VolumeDetail = () => import("./components/resources/VolumeDetail.vue");
+const NetworkDetail = () => import("./components/resources/NetworkDetail.vue");
+const ResourcesRegistries = () => import("./components/settings/Registries.vue");
 
 // Settings - Sub Pages
 import Appearance from "./components/settings/Appearance.vue";
@@ -72,26 +71,19 @@ const routes = [
                     },
                     {
                         path: "/resources",
-                        component: Resources,
                         redirect: "/resources/images",
-                        children: [
-                            {
-                                path: "images",
-                                component: ResourcesImages,
-                            },
-                            {
-                                path: "volumes",
-                                component: ResourcesVolumes,
-                            },
-                            {
-                                path: "networks",
-                                component: ResourcesNetworks,
-                            },
-                            {
-                                path: "registries",
-                                component: ResourcesRegistries,
-                            },
-                        ]
+                    },
+                    {
+                        path: "/resources/images",
+                        component: ImageDetail,
+                    },
+                    {
+                        path: "/resources/volumes",
+                        component: VolumeDetail,
+                    },
+                    {
+                        path: "/resources/networks",
+                        component: NetworkDetail,
                     },
                     {
                         path: "/settings",
@@ -112,6 +104,10 @@ const routes = [
                             {
                                 path: "globalEnv",
                                 component: GlobalEnv,
+                            },
+                            {
+                                path: "registries",
+                                component: ResourcesRegistries,
                             },
                             {
                                 path: "about",

@@ -20,11 +20,12 @@ declare module 'vue' {
     General: typeof import('./src/components/settings/General.vue')['default']
     GlobalEnv: typeof import('./src/components/settings/GlobalEnv.vue')['default']
     HiddenInput: typeof import('./src/components/HiddenInput.vue')['default']
-    Images: typeof import('./src/components/resources/Images.vue')['default']
+    ImageDetail: typeof import('./src/components/resources/ImageDetail.vue')['default']
     Login: typeof import('./src/components/Login.vue')['default']
+    NetworkDetail: typeof import('./src/components/resources/NetworkDetail.vue')['default']
     NetworkInput: typeof import('./src/components/NetworkInput.vue')['default']
-    Networks: typeof import('./src/components/resources/Networks.vue')['default']
-    Registries: typeof import('./src/components/resources/Registries.vue')['default']
+    Registries: typeof import('./src/components/settings/Registries.vue')['default']
+    ResourcesSidebar: typeof import('./src/components/ResourcesSidebar.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Security: typeof import('./src/components/settings/Security.vue')['default']
@@ -33,6 +34,6 @@ declare module 'vue' {
     Terminal: typeof import('./src/components/Terminal.vue')['default']
     TwoFADialog: typeof import('./src/components/TwoFADialog.vue')['default']
     Uptime: typeof import('./src/components/Uptime.vue')['default']
-    Volumes: typeof import('./src/components/resources/Volumes.vue')['default']
+    VolumeDetail: typeof import('./src/components/resources/VolumeDetail.vue')['default']
   }
 }

@@ -1,16 +1,13 @@
 <template>
     <div class="container-fluid">
         <div class="row">
-            <div v-if="!$root.isMobile" class="col-12 col-md-4 col-xl-3">
-                <div>
-                    <router-link to="/compose" class="btn btn-primary mb-3"><font-awesome-icon icon="plus" /> {{ $t("compose") }}</router-link>
-                </div>
-                <StackList :scrollbar="true" />
+            <div class="col-12 col-md-4 col-xl-3 mb-3">
+                <ResourcesSidebar v-model:endpoint="endpoint" />
             </div>
 
             <div ref="container" class="col-12 col-md-8 col-xl-9 mb-3">
                 <!-- Add :key to disable vue router re-use the same component -->
-                <router-view :key="$route.fullPath" :calculatedHeight="height" />
+                <router-view :key="$route.fullPath" :endpoint="endpoint" :calculatedHeight="height" />
             </div>
         </div>
     </div>
@@ -18,16 +15,31 @@
 
 <script>
 
-import StackList from "../components/StackList.vue";
+import ResourcesSidebar from "../components/ResourcesSidebar.vue";
 
 export default {
     components: {
-        StackList,
+        ResourcesSidebar,
     },
     data() {
         return {
-            height: 0
+            height: 0,
+            endpoint: localStorage.resourcesEndpoint || "",
         };
+    },
+    watch: {
+        endpoint() {
+            localStorage.resourcesEndpoint = this.endpoint;
+        },
+
+        "$root.agentList"() {
+            const list = this.$root.agentList || {};
+
+            // Reset when the selected agent disappeared
+            if (this.endpoint && Object.keys(list).length > 0 && !list[this.endpoint]) {
+                this.endpoint = "";
+            }
+        },
     },
     mounted() {
         this.height = this.$refs.container.offsetHeight;

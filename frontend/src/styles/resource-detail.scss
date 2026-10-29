@@ -1,0 +1,191 @@
+@import "./vars.scss";
+
+/* Shared look for the resource detail pages.
+ * Colours go through custom properties so the light theme keeps working. */
+.resource-detail {
+    --card-bg: #fff;
+    --card-border: #dee2e6;
+    --panel-bg: #f6f7f9;
+    --strong: #111;
+    --muted: #6c757d;
+    --dim: #adb5bd;
+    --mono-bg: #f1f3f5;
+
+    .dark & {
+        --card-bg: #{$dark-bg};
+        --card-border: #{$dark-border-color};
+        --panel-bg: #{$dark-header-bg};
+        --strong: #dbe3eb;
+        --muted: #8b949e;
+        --dim: #5f6b76;
+        --mono-bg: #0b0f15;
+    }
+
+    .detail-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .detail-title {
+        margin: 0;
+        font-size: 25px;
+        font-weight: 600;
+        color: var(--strong);
+        word-break: break-all;
+
+        .tag {
+            color: var(--muted);
+            font-weight: 400;
+        }
+    }
+
+    .badge-lg {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 5px 10px;
+        border-radius: 50rem;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+
+        .btn {
+            border-radius: 50rem;
+            font-size: 13px;
+            padding: 6px 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+    }
+
+    .btn-dark {
+        background: var(--panel-bg);
+        border: 1px solid var(--card-border);
+        color: var(--strong);
+
+        &:hover:not(:disabled) {
+            border-color: $primary;
+            color: $primary;
+        }
+
+        &:disabled {
+            opacity: 0.45;
+        }
+    }
+
+    .note {
+        margin-bottom: 16px;
+        font-size: 12.5px;
+        color: var(--dim);
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+
+        @media (max-width: 1200px) {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .section-title {
+        margin: 0 0 8px;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--strong);
+    }
+
+    section {
+        margin-bottom: 20px;
+    }
+
+    .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 4px 12px;
+    }
+
+    .kv-row {
+        display: flex;
+        gap: 12px;
+        padding: 8px 0;
+        font-size: 13px;
+        border-bottom: 1px solid var(--card-border);
+
+        &:last-child {
+            border-bottom: 0;
+        }
+    }
+
+    .kv-k {
+        flex: 0 0 34%;
+        color: var(--muted);
+    }
+
+    .kv-v {
+        flex: 1 1 auto;
+        color: var(--strong);
+        word-break: break-all;
+    }
+
+    .mono {
+        font-family: "JetBrains Mono", Menlo, monospace;
+        font-size: 12px;
+    }
+
+    .crow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--card-border);
+
+        &:last-child {
+            border-bottom: 0;
+        }
+    }
+
+    .crow-main {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .crow-name {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--strong);
+    }
+
+    .crow-sub {
+        font-size: 12px;
+        color: var(--muted);
+        word-break: break-all;
+    }
+
+    .chip {
+        display: inline-block;
+        padding: 2px 9px;
+        margin: 0 6px 6px 0;
+        border-radius: 50rem;
+        background: var(--mono-bg);
+        border: 1px solid var(--card-border);
+        font-family: "JetBrains Mono", Menlo, monospace;
+        font-size: 11.5px;
+        color: var(--strong);
+    }
+
+    .empty-state {
+        padding: 40px 10px;
+        text-align: center;
+        color: var(--dim);
+    }
+}
