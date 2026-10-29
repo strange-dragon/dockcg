@@ -9,7 +9,8 @@ export async function up(knex: Knex): Promise<void> {
         table.string("url", 255).notNullable();
         table.string("username", 255).notNullable();
         table.string("password", 1024).notNullable();
-        table.string("createdDate", 255);
+        // redbean maps the `createdDate` bean property onto this snake_case column
+        table.string("created_date", 255);
     });
 }
 
