@@ -6,7 +6,7 @@
 
 A fancy, easy-to-use and reactive self-hosted docker compose.yaml stack-oriented manager.
 
-> **About this fork** — Dockcg is a personal fork of [Dockge](https://github.com/louislam/dockge), so all credit for the original goes upstream. On top of the compose-only workflow it adds a **System Resources** section (Images / Volumes / Networks / private Registries). Containers are still 100% managed by `compose.yaml`; nothing here can run a standalone container.
+> **About this fork** — Dockcg is a personal fork of [Dockge](https://github.com/louislam/dockge); all credit for the original design and code goes upstream. On top of the compose-only workflow it adds a **System Resources** section (Images / Volumes / Networks / private Registries). Containers are still 100% managed by `compose.yaml`; nothing here can run a standalone container.
 >
 > The image under `strange-dragon/dockcg` is **not published yet**, so build it yourself:
 > ```bash
@@ -17,9 +17,7 @@ A fancy, easy-to-use and reactive self-hosted docker compose.yaml stack-oriented
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/strange-dragon/dockcg?logo=github&style=flat)](https://github.com/strange-dragon/dockcg) [![Docker Pulls](https://img.shields.io/docker/pulls/strange-dragon/dockcg?logo=docker)](https://hub.docker.com/r/strange-dragon/dockcg/tags) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/strange-dragon/dockcg/latest?label=docker%20image%20ver.)](https://hub.docker.com/r/strange-dragon/dockcg/tags) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/strange-dragon/dockcg/master?logo=github)](https://github.com/strange-dragon/dockcg/commits/master/)
 
-<img src="https://github.com/louislam/dockge/assets/1336778/26a583e1-ecb1-4a8d-aedf-76157d714ad7" width="900" alt="" />
-
-View Video: https://youtu.be/AWAlOQeNpgU?t=48
+![Stack detail with the compose.yaml editor](./docs/screenshots/compose.png)
 
 ## ⭐ Features
 
@@ -28,16 +26,25 @@ View Video: https://youtu.be/AWAlOQeNpgU?t=48
   - Update Docker Images
 - ⌨️ Interactive Editor for `compose.yaml`
 - 🦦 Interactive Web Terminal
-- 🕷️ (1.4.0 🆕) Multiple agents support - You can manage multiple stacks from different Docker hosts in one single interface
+- 🕷️ Multiple agents support - You can manage multiple stacks from different Docker hosts in one single interface
 - 🏪 Convert `docker run ...` commands into `compose.yaml`
 - 📙 File based structure - Dockcg won't kidnap your compose files, they are stored on your drive as usual. You can interact with them using normal `docker compose` commands
-
-<img src="https://github.com/louislam/dockge/assets/1336778/cc071864-592e-4909-b73a-343a57494002" width=300 />
-
 - 🚄 Reactive - Everything is just responsive. Progress (Pull/Up/Down) and terminal output are in real-time
-- 🐣 Easy-to-use & fancy UI - If you love Uptime Kuma's UI/UX, you will love this one too
+- 🐣 Easy-to-use & fancy UI
+- 🌐 English and Simplified Chinese only, English by default (`Settings → Appearance → Language`)
 
-![](https://github.com/louislam/dockge/assets/1336778/89fc1023-b069-42c0-a01c-918c495f1a6a)
+### Added in this fork: System resources
+
+Read-only inventory plus targeted cleanup for everything `compose.yaml` doesn't own directly. Container lifecycle is deliberately **not** exposed here.
+
+- **Images** – tag/size/created with in-use, unused and dangling state resolved from `com.docker.compose.project` labels, pre-pull with live terminal progress, per-image delete, prune of unused/dangling images
+- **Volumes** – mountpoint/driver/scope, which stack + service + container mounts it, delete, prune of unattached volumes (compose-owned volumes are skipped unless you opt in)
+- **Networks** – bridge/overlay/host with subnet and internal flags, owning stack, attached containers, cross-stack `external: true` snippet generator, prune
+- **Registries** – Docker Hub / ghcr.io / Harbor credentials, `docker login` performed in the background, password encrypted at rest and never returned to the client
+
+Cleanup never shells out to `docker prune`: the backend computes candidates and removes them one by one, refusing anything still in use or owned by a compose project.
+
+![Appearance settings with the language selector](./docs/screenshots/appearance.png)
 
 ## 🔧 How to Install
 
@@ -69,11 +76,11 @@ cd /opt/dockcg
 # Download the compose.yaml
 curl https://raw.githubusercontent.com/strange-dragon/dockcg/master/compose.yaml --output compose.yaml
 
-# Start the server
-docker compose up -d
+# Start the server (builds the image locally, it is not published yet)
+docker compose up -d --build
 
 # If you are using docker-compose V1 or Podman
-# docker-compose up -d
+# docker-compose up -d --build
 ```
 
 Dockcg is now running on http://localhost:5001
@@ -129,19 +136,32 @@ services:
 
 ```bash
 cd /opt/dockcg
-docker compose pull && docker compose up -d
+git pull            # if you cloned this repo
+docker compose build && docker compose up -d
 ```
 
 ## Screenshots
 
-![](https://github.com/louislam/dockge/assets/1336778/e7ff0222-af2e-405c-b533-4eab04791b40)
+Taken from this fork running locally (English, dark theme). The stack list is empty in a few of them because that machine had no Docker daemon attached — the rest of the layout is what you get after `compose up`.
 
+![Stack detail](./docs/screenshots/compose.png)
 
-![](https://github.com/louislam/dockge/assets/1336778/7139e88c-77ed-4d45-96e3-00b66d36d871)
+![Settings → Appearance](./docs/screenshots/appearance.png)
 
-![](https://github.com/louislam/dockge/assets/1336778/f019944c-0e87-405b-a1b8-625b35de1eeb)
+## Dependencies
 
-![](https://github.com/louislam/dockge/assets/1336778/a4478d23-b1c4-4991-8768-1a7cad3472e3)
+This fork does not pull anything from the upstream author's Docker Hub namespace, and it does not call any upstream-hosted service:
+
+| Thing | Status in this fork |
+|---|---|
+| Base image `louislam/dockge:base` | **Removed** — `docker/Dockerfile` now builds from `node:22-bookworm-slim`, installs `docker-ce-cli` + `docker-compose-plugin` itself |
+| Healthcheck image `louislam/dockge:build-healthcheck` | **Removed** — compiled from `extra/healthcheck.go` in a `golang:1.21-bookworm` stage inside the same Dockerfile |
+| `docker/Base.Dockerfile`, `docker/BuildHealthCheck.Dockerfile` | **Deleted** — they only existed to publish those two upstream images |
+| npm dependencies | Ordinary public packages (`express`, `socket.io`, `vue`, …) pinned by `package-lock.json`; `npm ci` is fully reproducible |
+| `@louislam/sqlite3` | A regular npm package from the public registry (a SQLite binding with Node 22 prebuilt binaries). If you want zero `louislam`-scoped packages, the alternatives are compiling official `sqlite3` from source in the image or migrating to `better-sqlite3` — both need real code changes, not a rename |
+| README screenshots / demo video | **Replaced** — the images above are captured from this fork, not hot-linked from the upstream repo |
+
+The only remaining upstream reference is the attribution link in the first paragraph.
 
 
 ## Motivations

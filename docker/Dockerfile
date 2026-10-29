@@ -1,27 +1,60 @@
 ############################################
-# Healthcheck Binary
+# Healthcheck binary (Go)
+#
+# Built on the builder's own platform and with CGO off, so the resulting
+# static binary works for every target arch we publish without needing an
+# emulated toolchain per platform.
 ############################################
-FROM louislam/dockge:build-healthcheck AS build_healthcheck
+FROM --platform=$BUILDPLATFORM golang:1.21.4-bookworm AS build_healthcheck
+WORKDIR /app
+COPY ./extra/healthcheck.go ./extra/healthcheck.go
+RUN CGO_ENABLED=0 go build -o ./extra/healthcheck ./extra/healthcheck.go
 
 ############################################
-# Build
+# Base image: Node + docker CLI + compose plugin
+#
+# Everything this project needs is installed here, so the image no longer
+# depends on a prebuilt third-party base image from a Docker Hub namespace.
 ############################################
-FROM louislam/dockge:base AS build
+FROM node:22-bookworm-slim AS base
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        dumb-init \
+        gnupg \
+        unzip \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg \
+        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        docker-ce-cli \
+        docker-compose-plugin \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g tsx
+
+############################################
+# Build: production dependencies only
+############################################
+FROM base AS build
 WORKDIR /app
-COPY --chown=node:node  ./package.json ./package.json
-COPY --chown=node:node  ./package-lock.json ./package-lock.json
+COPY --chown=node:node ./package.json ./package.json
+COPY --chown=node:node ./package-lock.json ./package-lock.json
 RUN npm ci --omit=dev
 
 ############################################
-# ⭐ Main Image
+# ⭐ Main image
 ############################################
-FROM louislam/dockge:base AS release
+FROM base AS release
 WORKDIR /app
 COPY --chown=node:node --from=build_healthcheck /app/extra/healthcheck /app/extra/healthcheck
 COPY --from=build /app/node_modules /app/node_modules
-COPY --chown=node:node  . .
+COPY --chown=node:node . .
 RUN mkdir ./data
-
 
 # It is just for safe, as by default, it is disabled in the latest Node.js now.
 # Read more:
@@ -36,7 +69,7 @@ ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["tsx", "./backend/index.ts"]
 
 ############################################
-# Mark as Nightly
+# Mark as nightly
 ############################################
 FROM release AS nightly
 RUN npm run mark-as-nightly

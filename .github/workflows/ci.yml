@@ -82,23 +82,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 匿名拉取受限时给出清晰日志，而不是让 build 静默失败
-      - name: Pull base images
-        run: |
-          set -euo pipefail
-          for img in louislam/dockge:base louislam/dockge:build-healthcheck; do
-            ok=0
-            for attempt in 1 2 3; do
-              if docker pull "$img"; then ok=1; break; fi
-              echo "pull $img failed (attempt $attempt), retrying..."
-              sleep 10
-            done
-            if [ "$ok" != "1" ]; then
-              echo "::error::cannot pull base image $img (Docker Hub rate limit?)"
-              exit 1
-            fi
-          done
-
+      # 镜像是自包含的（node:22 + golang 两个官方镜像），不再预拉任何第三方基础镜像
       - name: Build image (linux/amd64, no push)
         uses: docker/build-push-action@v6
         with:

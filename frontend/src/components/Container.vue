@@ -106,9 +106,9 @@
                         />
                     </div>
 
-                    <!-- TODO: Search online: https://hub.docker.com/api/content/v1/products/search?q=louislam%2Fuptime&source=community&page=1&page_size=4 -->
+                    <!-- TODO: Search online images (e.g. the Docker Hub search API) to fill this list -->
                     <datalist id="image-datalist">
-                        <option value="louislam/uptime-kuma:1" />
+                        <option value="nginx:latest" />
                     </datalist>
                     <div class="form-text"></div>
                 </div>
