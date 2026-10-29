@@ -1,9 +1,10 @@
 name: Nightly Release
 
 on:
-  schedule:
-    # Runs at 2:00 AM UTC every day
-    - cron: "0 2 * * *"
+  # fork 里没有 DOCKERHUB_USERNAME / GHCR_TOKEN，定时跑必然失败且白耗额度，
+  # 因此改为仅手动触发。需要 nightly 时手动 Run workflow 即可。
+  # schedule:
+  #   - cron: "0 2 * * *"
   workflow_dispatch:  # Allow manual trigger
 
 permissions: {}

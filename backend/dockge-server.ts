@@ -23,6 +23,7 @@ import { generatePasswordHash } from "./password-hash";
 import { Bean } from "redbean-node/dist/bean";
 import { Arguments, Config, DockgeSocket } from "./util-server";
 import { DockerSocketHandler } from "./agent-socket-handlers/docker-socket-handler";
+import { DockerResourceSocketHandler } from "./agent-socket-handlers/docker-resource-socket-handler";
 import expressStaticGzip from "express-static-gzip";
 import path from "path";
 import { TerminalSocketHandler } from "./agent-socket-handlers/terminal-socket-handler";
@@ -68,6 +69,7 @@ export class DockgeServer {
      */
     agentSocketHandlerList : AgentSocketHandler[] = [
         new DockerSocketHandler(),
+        new DockerResourceSocketHandler(),
         new TerminalSocketHandler(),
     ];
 

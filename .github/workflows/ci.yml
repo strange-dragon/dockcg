@@ -1,32 +1,39 @@
-name: Node.js CI - Dockge
+name: CI - Verify
 
+# 只在代码真正变化时验证一次，避免无意义消耗 Actions 额度
 on:
   push:
     branches: [master]
     paths-ignore:
-      - '*.md'
+      - '**.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
     branches: [master]
     paths-ignore:
-      - '*.md'
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
 
 permissions: {}
 
+# 同一分支连续 push 时取消旧的那次，只保留最新
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
-    name: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [22] # Can be changed
-    runs-on: ${{ matrix.os }}
+  verify:
+    name: Verify (types + lint + build + docker smoke test)
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: write # docker buildx 的 gha 缓存需要
+
     steps:
       - name: Disable autocrlf
-        run: | # Mainly for Windows
+        run: |
           git config --global core.autocrlf false
           git config --global core.eol lf
 
@@ -36,19 +43,109 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{matrix.node}}
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-fund
 
       - name: Lint
         run: npm run lint
 
-      - name: Check Typescript
+      - name: Check TypeScript
         run: npm run check-ts
 
-      - name: Build
+      # 镜像里的 frontend-dist 是构建产物，Dockerfile 直接 COPY . 进去，
+      # 所以必须先构建前端（等同 npm run release-final 的顺序）
+      - name: Build frontend
         run: npm run build:frontend
-      # more things can be add later like tests etc..
+
+      # 断言新功能确实进了产物：socket 事件名是字符串字面量，压缩后仍可搜到
+      - name: Assert resources UI is bundled
+        run: |
+          set -euo pipefail
+          for evt in getDockerImageList getDockerVolumeList getDockerNetworkList getRegistryList; do
+            if ! grep -rq "$evt" frontend-dist/assets; then
+              echo "::error::socket event '$evt' not found in frontend bundle"
+              exit 1
+            fi
+            echo "ok: $evt"
+          done
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 匿名拉取受限时给出清晰日志，而不是让 build 静默失败
+      - name: Pull base images
+        run: |
+          set -euo pipefail
+          for img in louislam/dockge:base louislam/dockge:build-healthcheck; do
+            ok=0
+            for attempt in 1 2 3; do
+              if docker pull "$img"; then ok=1; break; fi
+              echo "pull $img failed (attempt $attempt), retrying..."
+              sleep 10
+            done
+            if [ "$ok" != "1" ]; then
+              echo "::error::cannot pull base image $img (Docker Hub rate limit?)"
+              exit 1
+            fi
+          done
+
+      - name: Build image (linux/amd64, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          target: release
+          platforms: linux/amd64
+          load: true
+          tags: dockge:ci
+          cache-from: type=gha,scope=dockge
+          cache-to: type=gha,mode=max,scope=dockge
+
+      - name: Smoke test container
+        run: |
+          set -uo pipefail
+          docker run -d --name dockge-ci -p 5001:5001 dockge:ci
+          code=""
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5001/ || true)
+            if [ "$code" = "200" ] || [ "$code" = "302" ]; then
+              echo "Dockge responded with HTTP $code"
+              break
+            fi
+            sleep 3
+          done
+          echo "--- container status ---"
+          docker ps -a --filter name=dockge-ci
+          echo "--- logs ---"
+          docker logs dockge-ci 2>&1 | tail -60
+          if [ "$code" != "200" ] && [ "$code" != "302" ]; then
+            echo "::error::smoke test failed, last HTTP status: $code"
+            exit 1
+          fi
+
+      - name: Assert data dir initialized
+        run: |
+          set -euo pipefail
+          # 迁移失败会导致容器起不来，这里确认 data 目录已初始化
+          docker exec dockge-ci sh -c 'ls -la /app/data'
+          docker logs dockge-ci 2>&1 | grep -iE "migrat|registry" || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker logs dockge-ci > dockge-smoke.log 2>&1 || true
+          docker rm -f dockge-ci || true
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockge-smoke-log
+          path: dockge-smoke.log
+          if-no-files-found: ignore
+          retention-days: 3

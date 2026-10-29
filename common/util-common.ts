@@ -213,6 +213,10 @@ export function getContainerExecTerminalName(endpoint : string, stackName : stri
     return "container-exec-" + endpoint + "-" + stackName + "-" + container + "-" + index;
 }
 
+export function getImagePullTerminalName(endpoint : string) {
+    return "image-pull-" + endpoint;
+}
+
 export function copyYAMLComments(doc : Document, src : Document) {
     doc.comment = src.comment;
     doc.commentBefore = src.commentBefore;

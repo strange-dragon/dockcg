@@ -6,9 +6,16 @@ import Dashboard from "./pages/Dashboard.vue";
 import DashboardHome from "./pages/DashboardHome.vue";
 import Console from "./pages/Console.vue";
 import Compose from "./pages/Compose.vue";
+import Resources from "./pages/Resources.vue";
 import ContainerTerminal from "./pages/ContainerTerminal.vue";
 
 const Settings = () => import("./pages/Settings.vue");
+
+// Resources - Sub Pages
+const ResourcesImages = () => import("./components/resources/Images.vue");
+const ResourcesVolumes = () => import("./components/resources/Volumes.vue");
+const ResourcesNetworks = () => import("./components/resources/Networks.vue");
+const ResourcesRegistries = () => import("./components/resources/Registries.vue");
 
 // Settings - Sub Pages
 import Appearance from "./components/settings/Appearance.vue";
@@ -62,6 +69,29 @@ const routes = [
                     {
                         path: "/console/:endpoint",
                         component: Console,
+                    },
+                    {
+                        path: "/resources",
+                        component: Resources,
+                        redirect: "/resources/images",
+                        children: [
+                            {
+                                path: "images",
+                                component: ResourcesImages,
+                            },
+                            {
+                                path: "volumes",
+                                component: ResourcesVolumes,
+                            },
+                            {
+                                path: "networks",
+                                component: ResourcesNetworks,
+                            },
+                            {
+                                path: "registries",
+                                component: ResourcesRegistries,
+                            },
+                        ]
                     },
                     {
                         path: "/settings",
