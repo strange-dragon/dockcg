@@ -128,12 +128,33 @@ jobs:
             exit 1
           fi
 
-      - name: Assert data dir initialized
+      - name: Assert data dir and registry migration
         run: |
           set -euo pipefail
           # 迁移失败会导致容器起不来，这里确认 data 目录已初始化
           docker exec dockge-ci sh -c 'ls -la /app/data'
-          docker logs dockge-ci 2>&1 | grep -iE "migrat|registry" || true
+
+          # 拷整个 data 目录再用宿主机的 sqlite 驱动检查：sqlite 是 WAL 模式，
+          # 只拷 .db 会丢 -wal 里的内容；整目录同时避开和运行中的容器抢锁
+          rm -rf /tmp/dockge-data && docker cp dockge-ci:/app/data /tmp/dockge-data
+
+          cat > /tmp/check-db.cjs <<'EOF'
+          // 脚本在 /tmp 下，模块解析要显式指向仓库的 node_modules
+          const sqlite3 = require(process.cwd() + "/node_modules/@louislam/sqlite3");
+          const db = new sqlite3.Database("/tmp/dockge-data/dockge.db");
+          db.all("select name from sqlite_master where type = 'table'", (err, rows) => {
+              if (err) { console.error(err.message); process.exit(1); }
+              const tables = rows.map((r) => r.name);
+              console.log("tables:", tables.join(", "));
+              if (!tables.includes("registry")) {
+                  console.error("::error::registry table was not created by the migration");
+                  process.exit(1);
+              }
+              console.log("ok: registry table exists");
+              db.close();
+          });
+          EOF
+          node /tmp/check-db.cjs
 
       - name: Cleanup
         if: always()
