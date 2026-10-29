@@ -74,6 +74,11 @@ jobs:
             echo "ok: $evt"
           done
 
+      # 真实的端到端验证：部署一个 caddy compose 堆栈，再走前端同一套
+      # socket.io 协议调用 Resources 的 agent 事件，断言资源归属和清理安全性
+      - name: End-to-end resources test (real caddy stack)
+        run: npx tsx extra/test-resources.ts
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 

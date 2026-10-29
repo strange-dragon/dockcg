@@ -6,9 +6,13 @@ export class Registry extends BeanModel {
 
     /**
      * All registries of this Dockge instance, oldest first.
+     *
+     * redbean prepends its own `where` fragment, so an empty clause is used
+     * here and the ordering is applied in memory (same style as agent.ts).
      */
     static async getRegistryList() : Promise<Registry[]> {
-        return await R.findAll("registry", " 1 = 1 ORDER BY id ASC ", []) as Registry[];
+        const list = await R.findAll("registry") as Registry[];
+        return list.sort((a, b) => Number(a.id) - Number(b.id));
     }
 
     /**
