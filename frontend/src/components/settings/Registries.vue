@@ -2,6 +2,11 @@
     <div>
         <!-- Toolbar -->
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <select v-if="hasMultipleEndpoints" v-model="selectedEndpoint" class="form-select registry-endpoint" :aria-label="$t('dockerHost')">
+                <option v-for="(agent, agentEndpoint) in $root.agentList" :key="agentEndpoint" :value="agentEndpoint">
+                    {{ agent.name || agent.url || $t("currentEndpoint") }}
+                </option>
+            </select>
             <button class="btn btn-normal btn-sm" :disabled="loading" @click="loadRegistries">
                 <font-awesome-icon icon="arrows-rotate" :spin="loading" class="me-1" />
                 {{ $t("refresh") }}
@@ -21,6 +26,28 @@
         </div>
 
         <p class="registries-hint">{{ $t("registriesHint") }}</p>
+
+        <section class="shadow-box configured-sources mb-4">
+            <h2>{{ $t("configuredDockerSources") }}</h2>
+            <p class="registries-hint">{{ $t("configuredDockerSourcesHint") }}</p>
+            <p class="registries-hint">{{ $t("configuredSourceUnverified") }}</p>
+            <div v-if="loading" class="text-muted" role="status">{{ $t("loadingResources") }}</div>
+            <div v-else-if="loadError" class="text-danger">{{ loadError }}</div>
+            <template v-else>
+                <div class="source-group">
+                    <strong>{{ $t("dockerLoginSources") }}</strong>
+                    <span v-if="sources.loginRegistries.length === 0" class="text-muted">{{ $t("noDockerLoginSources") }}</span>
+                    <code v-for="name in sources.loginRegistries" :key="name" class="source-chip">{{ name }}</code>
+                </div>
+                <div class="source-group">
+                    <strong>{{ $t("dockerRegistryMirrors") }}</strong>
+                    <span v-if="sources.mirrors.length === 0" class="text-muted">{{ $t("noDockerRegistryMirrors") }}</span>
+                    <code v-for="mirror in sources.mirrors" :key="mirror" class="source-chip">{{ mirror }}</code>
+                </div>
+                <p v-if="sources.configError" class="text-warning small mb-0">{{ $t("dockerConfigReadFailed") }}</p>
+                <p v-if="sources.daemonError" class="text-warning small mb-0">{{ $t("dockerMirrorReadFailed") }} {{ sources.daemonError }}</p>
+            </template>
+        </section>
 
         <!-- Add / edit form -->
         <div v-if="showForm" class="shadow-box add-form mb-3">
@@ -129,6 +156,13 @@ export default {
     data() {
         return {
             registries: [],
+            sources: { loginRegistries: [],
+                mirrors: [],
+                configError: "",
+                daemonError: "" },
+            selectedEndpoint: this.$route.query.endpoint || this.endpoint,
+            loadError: "",
+            requestId: 0,
             loading: false,
             saving: false,
             syncingAll: false,
@@ -145,21 +179,49 @@ export default {
         };
     },
 
+    computed: {
+        hasMultipleEndpoints() {
+            return Object.keys(this.$root.agentList || {}).length > 1;
+        },
+    },
+
+    watch: {
+        selectedEndpoint() {
+            this.cancelForm();
+            this.registries = [];
+            this.loadRegistries();
+        },
+    },
+
     mounted() {
         this.loadRegistries();
     },
 
     methods: {
         loadRegistries() {
+            const requestId = ++this.requestId;
             this.loading = true;
+            this.loadError = "";
 
-            this.$root.emitAgent(this.endpoint, "getRegistryList", (res) => {
+            this.$root.emitAgent(this.selectedEndpoint, "getRegistryList", (res) => {
+                if (requestId !== this.requestId) {
+                    return;
+                }
                 this.loading = false;
 
-                if (res.ok) {
+                if (res?.ok) {
                     this.registries = res.registries;
+                    this.sources = res.sources || { loginRegistries: [],
+                        mirrors: [],
+                        configError: "",
+                        daemonError: "" };
                 } else {
-                    this.$root.toastRes(res);
+                    this.registries = [];
+                    this.sources = { loginRegistries: [],
+                        mirrors: [],
+                        configError: "",
+                        daemonError: "" };
+                    this.loadError = res?.msg || this.$t("unknownError");
                 }
             });
         },
@@ -203,7 +265,7 @@ export default {
         saveRegistry() {
             this.saving = true;
 
-            this.$root.emitAgent(this.endpoint, "saveRegistry", { ...this.form }, (res) => {
+            this.$root.emitAgent(this.selectedEndpoint, "saveRegistry", { ...this.form }, (res) => {
                 this.saving = false;
                 this.$root.toastRes(res);
 
@@ -217,18 +279,24 @@ export default {
         relogin(registry) {
             this.syncingId = registry.id;
 
-            this.$root.emitAgent(this.endpoint, "reloginRegistry", registry.id, (res) => {
+            this.$root.emitAgent(this.selectedEndpoint, "reloginRegistry", registry.id, (res) => {
                 this.syncingId = null;
                 this.$root.toastRes(res);
+                if (res.ok) {
+                    this.loadRegistries();
+                }
             });
         },
 
         reloginAll() {
             this.syncingAll = true;
 
-            this.$root.emitAgent(this.endpoint, "reloginAllRegistries", (res) => {
+            this.$root.emitAgent(this.selectedEndpoint, "reloginAllRegistries", (res) => {
                 this.syncingAll = false;
                 this.$root.toastRes(res);
+                if (res.ok) {
+                    this.loadRegistries();
+                }
             });
         },
 
@@ -245,7 +313,7 @@ export default {
             const registry = this.pendingRegistry;
             this.pendingRegistry = null;
 
-            this.$root.emitAgent(this.endpoint, "deleteRegistry", registry.id, (res) => {
+            this.$root.emitAgent(this.selectedEndpoint, "deleteRegistry", registry.id, (res) => {
                 this.$root.toastRes(res);
                 this.loadRegistries();
             });
@@ -258,9 +326,17 @@ export default {
 @import "../../styles/vars.scss";
 
 .registries-hint {
-    font-size: 13px;
+    font-size: 14px;
     opacity: 0.7;
 }
+
+.registry-endpoint { width: auto; min-width: 180px; }
+.configured-sources { padding: 16px 18px; }
+.configured-sources h2 { font-size: 17px; margin-bottom: 4px; }
+.source-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; }
+.source-group strong { min-width: 145px; }
+.source-chip { padding: 5px 9px; border-radius: 7px; background: #f1f3f5; overflow-wrap: anywhere; }
+.dark .source-chip { background: $dark-bg2; }
 
 .add-form {
     padding: 18px 20px;

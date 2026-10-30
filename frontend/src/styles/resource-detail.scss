@@ -31,7 +31,7 @@
 
     .detail-title {
         margin: 0;
-        font-size: 25px;
+        font-size: 24px;
         font-weight: 600;
         color: var(--strong);
         word-break: break-all;
@@ -43,7 +43,7 @@
     }
 
     .badge-lg {
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 700;
         padding: 5px 10px;
         border-radius: 50rem;
@@ -57,7 +57,7 @@
 
         .btn {
             border-radius: 50rem;
-            font-size: 13px;
+            font-size: 14px;
             padding: 6px 14px;
             display: inline-flex;
             align-items: center;
@@ -82,7 +82,7 @@
 
     .note {
         margin-bottom: 16px;
-        font-size: 12.5px;
+        font-size: 14px;
         color: var(--dim);
     }
 
@@ -98,7 +98,7 @@
 
     .section-title {
         margin: 0 0 8px;
-        font-size: 15px;
+        font-size: 17px;
         font-weight: 600;
         color: var(--strong);
     }
@@ -118,7 +118,7 @@
         display: flex;
         gap: 12px;
         padding: 8px 0;
-        font-size: 13px;
+        font-size: 14px;
         border-bottom: 1px solid var(--card-border);
 
         &:last-child {
@@ -139,7 +139,7 @@
 
     .mono {
         font-family: "JetBrains Mono", Menlo, monospace;
-        font-size: 12px;
+        font-size: 13px;
     }
 
     .crow {
@@ -160,13 +160,13 @@
     }
 
     .crow-name {
-        font-size: 13.5px;
+        font-size: 14px;
         font-weight: 600;
         color: var(--strong);
     }
 
     .crow-sub {
-        font-size: 12px;
+        font-size: 13px;
         color: var(--muted);
         word-break: break-all;
     }
@@ -179,7 +179,7 @@
         background: var(--mono-bg);
         border: 1px solid var(--card-border);
         font-family: "JetBrains Mono", Menlo, monospace;
-        font-size: 11.5px;
+        font-size: 12px;
         color: var(--strong);
     }
 

@@ -1,5 +1,11 @@
 <template>
     <div class="resource-sidebar">
+        <router-link to="/" class="overview-link" :class="{ active: activeTab === 'stacks' }">
+            <font-awesome-icon icon="layer-group" /> {{ $t("stacks") }}
+        </router-link>
+        <router-link to="/resources" class="overview-link" :class="{ active: activeTab === 'overview' }">
+            <font-awesome-icon icon="server" /> {{ $t("dockerResources") }}
+        </router-link>
         <!-- Segmented tabs: the list below swaps with the tab, exactly like the sidebar of a desktop app -->
         <div class="seg">
             <button
@@ -11,7 +17,7 @@
             </button>
         </div>
 
-        <div class="side-action">
+        <div v-if="activeTab !== 'overview' && activeTab !== 'containers'" class="side-action">
             <button class="btn btn-primary w-100" type="button" @click="primaryAction">
                 <font-awesome-icon :icon="actionIcon" /> {{ $t(actionLabel) }}
             </button>
@@ -27,14 +33,14 @@
         <StackList v-if="activeTab === 'stacks'" :scrollbar="true" />
 
         <!-- Resource lists: compact rows, one badge + one name, click opens the detail page -->
-        <div v-else class="shadow-box resource-list-box">
+        <div v-else-if="activeTab !== 'overview'" class="shadow-box resource-list-box">
             <div class="search-wrapper mb-2">
                 <input v-model="search" class="form-control search-input" :placeholder="$t('search')" autocomplete="off" />
             </div>
 
             <div class="resource-rows">
                 <button
-                    v-for="row in rows" :key="row.key" class="resource-row"
+                    v-for="row in loading || loadError ? [] : rows" :key="row.key" class="resource-row"
                     :class="{ sel: row.key === selectedKey }" type="button"
                     @click="openRow(row)"
                 >
@@ -42,7 +48,9 @@
                     <span class="resource-name">{{ row.label }}<span v-if="row.tag" class="tag">{{ row.tag }}</span></span>
                 </button>
 
-                <div v-if="!loading && rows.length === 0" class="empty">{{ $t("noResources") }}</div>
+                <div v-if="loading" class="empty" role="status">{{ $t("loadingResources") }}</div>
+                <div v-else-if="loadError" class="empty text-danger">{{ $t("resourceLoadFailed") }} {{ loadError }}</div>
+                <div v-else-if="rows.length === 0" class="empty">{{ $t("noResources") }}</div>
             </div>
 
             <div class="resource-footer">
@@ -96,10 +104,10 @@ import Terminal from "./Terminal.vue";
 import { getImagePullTerminalName } from "../../../common/util-common";
 
 const TABS = [
-    { key: "stacks",
-        label: "stacks",
-        action: "compose",
-        icon: "plus" },
+    { key: "containers",
+        label: "containers",
+        action: "scanContainers",
+        icon: "arrows-rotate" },
     { key: "images",
         label: "images",
         action: "pullImage",
@@ -134,7 +142,10 @@ export default {
             tabs: TABS,
             search: "",
             loading: false,
+            loadError: "",
+            requestId: 0,
             images: [],
+            containers: [],
             volumes: [],
             networks: [],
             showPull: false,
@@ -171,6 +182,12 @@ export default {
             if (path.startsWith("/resources/networks")) {
                 return "networks";
             }
+            if (path.startsWith("/resources/containers")) {
+                return "containers";
+            }
+            if (path === "/resources") {
+                return "overview";
+            }
             return "stacks";
         },
 
@@ -202,6 +219,20 @@ export default {
         rows() {
             const keyword = this.search.trim().toLowerCase();
             const match = (text) => !keyword || String(text).toLowerCase().includes(keyword);
+
+            if (this.activeTab === "containers") {
+                return this.containers
+                    .filter((container) => match(container.name) || match(container.image) || match(container.id))
+                    .map((container) => ({
+                        key: container.id,
+                        label: container.name,
+                        tag: ` · ${container.image}`,
+                        badge: container.state === "running" ? "runningContainer" : "stoppedContainer",
+                        badgeClass: container.state === "running" ? "bg-primary" : "bg-secondary",
+                        type: "containers",
+                        query: container.id,
+                    }));
+            }
 
             if (this.activeTab === "images") {
                 return this.images
@@ -260,6 +291,11 @@ export default {
         "$root.agentList"() {
             this.refresh();
         },
+        "$root.socketIO.connected"(connected) {
+            if (connected) {
+                this.refresh();
+            }
+        },
     },
 
     mounted() {
@@ -297,14 +333,34 @@ export default {
         },
 
         refresh() {
+            const requestId = ++this.requestId;
+            this.loadError = "";
+            if (this.activeTab === "containers") {
+                this.loading = true;
+                this.$root.emitAgent(this.endpoint, "getDockerContainerMigrationList", (res) => {
+                    if (requestId !== this.requestId) {
+                        return;
+                    }
+                    this.loading = false;
+                    if (res?.ok) {
+                        this.containers = res.containers;
+                    } else {
+                        this.loadError = res?.msg || this.$t("unknownError");
+                    }
+                });
+                return;
+            }
             if (this.activeTab === "images") {
                 this.loading = true;
                 this.$root.emitAgent(this.endpoint, "getDockerImageList", (res) => {
+                    if (requestId !== this.requestId) {
+                        return;
+                    }
                     this.loading = false;
                     if (res.ok) {
                         this.images = res.images;
                     } else {
-                        this.$root.toastRes(res);
+                        this.loadError = res?.msg || this.$t("unknownError");
                     }
                 });
                 return;
@@ -313,11 +369,14 @@ export default {
             if (this.activeTab === "volumes") {
                 this.loading = true;
                 this.$root.emitAgent(this.endpoint, "getDockerVolumeList", (res) => {
+                    if (requestId !== this.requestId) {
+                        return;
+                    }
                     this.loading = false;
                     if (res.ok) {
                         this.volumes = res.volumes;
                     } else {
-                        this.$root.toastRes(res);
+                        this.loadError = res?.msg || this.$t("unknownError");
                     }
                 });
                 return;
@@ -326,14 +385,19 @@ export default {
             if (this.activeTab === "networks") {
                 this.loading = true;
                 this.$root.emitAgent(this.endpoint, "getDockerNetworkResourceList", (res) => {
+                    if (requestId !== this.requestId) {
+                        return;
+                    }
                     this.loading = false;
                     if (res.ok) {
                         this.networks = res.networks;
                     } else {
-                        this.$root.toastRes(res);
+                        this.loadError = res?.msg || this.$t("unknownError");
                     }
                 });
+                return;
             }
+            this.loading = false;
         },
 
         doPull() {
@@ -380,13 +444,29 @@ export default {
 <style lang="scss" scoped>
 @import "../styles/vars.scss";
 
+.overview-link {
+    display: block;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    color: #343a40;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+
+    &:hover, &.active { background: #eef4fa; color: #246ca0; }
+    .dark & { color: $dark-font-color; }
+    .dark &:hover, .dark &.active { background: $dark-header-bg; color: $primary; }
+}
+
 .seg {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
     padding: 4px;
     margin-bottom: 10px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.04);
+    background: #f1f3f5;
 
     .dark & {
         background: $dark-header-bg;
@@ -399,22 +479,24 @@ export default {
     border: 0;
     border-radius: 7px;
     background: transparent;
-    color: $dark-font-color;
-    font-size: 12.5px;
+    color: #495057;
+    font-size: 13px;
     line-height: 1.2;
     cursor: pointer;
     transition: all 0.1s ease-in-out;
     white-space: nowrap;
 
-    &:hover {
-        color: #fff;
-    }
+    &:hover { color: #246ca0; background: #e7edf3; }
+    .dark & { color: $dark-font-color; }
+    .dark &:hover { color: #fff; background: $dark-bg; }
 
     &.active {
-        background: rgba(116, 194, 255, 0.16);
-        color: $primary;
+        background: #fff;
+        color: #246ca0;
         font-weight: 600;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+
+        .dark & { background: $dark-bg; color: $primary; }
     }
 }
 
@@ -443,23 +525,25 @@ export default {
     background: transparent;
     color: inherit;
     text-align: left;
-    font-size: 13.5px;
+    font-size: 14px;
     cursor: pointer;
     transition: background 0.1s ease-in-out;
 
     &:hover {
-        background: rgba(255, 255, 255, 0.04);
+        background: #f1f3f5;
+        .dark & { background: $dark-header-bg; }
     }
 
     /* Sunken selection instead of a highlighted border */
     &.sel {
-        background: $dark-bg2;
-        box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.72);
+        background: #e7f2fb;
+        color: #185a87;
+        .dark & { background: $dark-bg2; color: $primary; }
     }
 
     .badge {
         flex: 0 0 auto;
-        font-size: 10.5px;
+        font-size: 11px;
         font-weight: 600;
         padding: 3px 7px;
     }
@@ -471,15 +555,17 @@ export default {
     }
 
     .tag {
-        color: $dark-font-color3;
+        color: #6c757d;
+        .dark & { color: $dark-font-color; }
     }
 }
 
 .empty {
     padding: 18px 8px;
     text-align: center;
-    color: $dark-font-color3;
-    font-size: 13px;
+    color: #6c757d;
+    font-size: 14px;
+    .dark & { color: $dark-font-color; }
 }
 
 .resource-footer {
@@ -487,13 +573,14 @@ export default {
     text-align: right;
 
     .btn-link {
-        color: $dark-font-color3;
+        color: #6c757d;
         text-decoration: none;
-        font-size: 12px;
+        font-size: 13px;
+        .dark & { color: $dark-font-color; }
     }
 }
 
 .search-input {
-    font-size: 13px;
+    font-size: 14px;
 }
 </style>

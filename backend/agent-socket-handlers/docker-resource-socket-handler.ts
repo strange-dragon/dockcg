@@ -8,8 +8,14 @@ import { R } from "redbean-node";
 import { Registry } from "../models/registry";
 import { decryptSecret, encryptSecret } from "../secret-box";
 import { dockerExec } from "../docker-cli";
+import { getDockerRegistrySources } from "../docker-registry-sources";
+import { addServiceNetwork, saveServiceNetwork } from "../compose-network-association";
+import { Stack } from "../stack";
+import { realpath } from "node:fs/promises";
+import path from "node:path";
 import {
     getSnapshot,
+    getVolumeUsage,
     listImages,
     listContainers,
     listNetworks,
@@ -17,18 +23,20 @@ import {
     pruneImages,
     pruneNetworks,
     pruneVolumes,
+    previewPrune,
     removeImage,
     removeNetwork,
     removeVolume
 } from "../docker-resources";
 import {
-    connectContainers,
     createNetwork,
     createVolume,
     inspectImage,
     migrateVolume
 } from "../docker-resource-actions";
 import { log } from "../log";
+import { createContainerComposeDraft } from "../container-compose-draft";
+import { createHash } from "node:crypto";
 
 const IMAGE_REFERENCE_REGEX = /^[A-Za-z0-9][A-Za-z0-9._\-/:@]*$/;
 const REGISTRY_URL_REGEX = /^[A-Za-z0-9._\-:/]+$/;
@@ -47,6 +55,10 @@ function requireBoolean(value : unknown, fieldName : string) : boolean {
     return value;
 }
 
+function composeHash(source : string) : string {
+    return createHash("sha256").update(source).digest("hex");
+}
+
 /**
  * Read-only Docker resource management (images / volumes / networks)
  * plus private registry credentials.
@@ -57,6 +69,44 @@ function requireBoolean(value : unknown, fieldName : string) : boolean {
 export class DockerResourceSocketHandler extends AgentSocketHandler {
     create(socket : DockcgSocket, server : DockcgServer, agentSocket : AgentSocket) {
         // Do not call super.create()
+
+        agentSocket.on("getDockerContainerMigrationList", async (callback) => {
+            try {
+                checkLogin(socket);
+                const containers = await listContainers();
+                callbackResult({ ok: true,
+                    containers }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        agentSocket.on("getDockerContainerComposeDraft", async (id : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const result = await createContainerComposeDraft(requireString(id, "Container ID"));
+                callbackResult({ ok: true,
+                    ...result }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        agentSocket.on("previewDockerResourcePrune", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const data = payload as { kind? : unknown, mode? : unknown };
+                if (!data || ![ "images", "volumes", "networks" ].includes(String(data.kind))) {
+                    throw new ValidationError("Invalid resource kind");
+                }
+                const mode = data.mode === "unused" ? "unused" : "dangling";
+                const candidates = await previewPrune(data.kind as "images" | "volumes" | "networks", server.stacksDir, mode);
+                callbackResult({ ok: true,
+                    candidates }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
 
         // ***************************
         // Images
@@ -167,10 +217,21 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             }
         });
 
+        agentSocket.on("getDockerVolumeUsage", async (name : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const sizeText = await getVolumeUsage(requireString(name, "Volume name"));
+                callbackResult({ ok: true,
+                    sizeText }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
         agentSocket.on("removeDockerVolume", async (name : unknown, callback) => {
             try {
                 checkLogin(socket);
-                await removeVolume(requireString(name, "Volume name"));
+                await removeVolume(requireString(name, "Volume name"), server.stacksDir);
                 callbackResult({ ok: true,
                     msg: "Volume removed" }, callback);
             } catch (e) {
@@ -182,7 +243,7 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             try {
                 checkLogin(socket);
                 const include = requireBoolean(includeCompose, "includeCompose");
-                const result = await pruneVolumes(include);
+                const result = await pruneVolumes(include, server.stacksDir);
                 callbackResult({ ok: true,
                     ...result }, callback);
             } catch (e) {
@@ -237,7 +298,10 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 const volumes = await listVolumes(containers);
                 const sourceInfo = volumes.find((volume) => volume.name === source);
 
-                if (sourceInfo && sourceInfo.used) {
+                if (!sourceInfo) {
+                    throw new ValidationError("Source volume not found");
+                }
+                if (sourceInfo.used) {
                     throw new ValidationError("A container is still mounting this volume. Stop the stack first.");
                 }
 
@@ -268,6 +332,77 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             }
         });
 
+        agentSocket.on("connectDockerContainerNetwork", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                if (typeof payload !== "object" || payload === null) {
+                    throw new ValidationError("Invalid network connection data");
+                }
+
+                const data = payload as { network? : unknown, containerId? : unknown, apply? : unknown, expectedHash? : unknown };
+                const networkName = requireString(data.network, "Network name");
+                const containerId = requireString(data.containerId, "Container ID");
+
+                if (!/^[a-f0-9]{12,64}$/.test(containerId)) {
+                    throw new ValidationError("Invalid container ID");
+                }
+
+                const containers = await listContainers();
+                const matches = containers.filter((item) => item.id === containerId || item.id.startsWith(containerId));
+                const container = matches.length === 1 ? matches[0] : null;
+                const networks = await listNetworks(containers);
+                const network = networks.find((item) => item.name === networkName);
+
+                if (!container || !network) {
+                    throw new ValidationError("Container or network not found");
+                }
+                if (network.builtIn) {
+                    throw new ValidationError("Built-in networks cannot be configured here");
+                }
+                if (network.containers.some((item) => container.id.startsWith(item.id))) {
+                    throw new ValidationError("Container is already connected to this network");
+                }
+
+                let stack : Stack | null = null;
+                let originalYAML = "";
+                let updatedYAML = "";
+
+                if (container.stack && container.service && /^[a-z0-9_-]+$/.test(container.stack)
+                    && await Stack.composeFileExists(server.stacksDir, container.stack)) {
+                    const rootPath = await realpath(server.stacksDir);
+                    const stackPath = await realpath(path.join(server.stacksDir, container.stack));
+
+                    if (path.dirname(stackPath) === rootPath) {
+                        stack = await Stack.getStack(server, container.stack);
+                        originalYAML = stack.composeYAML;
+                        updatedYAML = addServiceNetwork(originalYAML, container.stack, container.service, network);
+                    }
+                }
+
+                if (!stack) {
+                    throw new ValidationError("This container has no managed Compose file. Use the generated external network snippet in its own Compose project.");
+                }
+                if (data.apply === true && data.expectedHash !== composeHash(originalYAML)) {
+                    throw new ValidationError("Compose file changed after the preview. Preview it again.");
+                }
+                if (data.apply === true && updatedYAML !== originalYAML) {
+                    await saveServiceNetwork(stack.composeFilePath, originalYAML, updatedYAML, true);
+                    server.sendStackList().catch((e) => log.warn("network", `Unable to refresh stack list: ${String(e)}`));
+                }
+
+                callbackResult({ ok: true,
+                    msg: data.apply === true ? "networkComposeSynced" : "networkComposePreview",
+                    msgi18n: true,
+                    composeSynced: data.apply === true,
+                    stack: container.stack,
+                    composeHash: composeHash(originalYAML),
+                    composeYAML: updatedYAML }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
         agentSocket.on("getDockerResourceSummary", async (callback) => {
             try {
                 checkLogin(socket);
@@ -280,8 +415,28 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                         unusedImageCount: snapshot.images.filter((image) => !image.used).length,
                         volumeCount: snapshot.volumes.length,
                         unusedVolumeCount: snapshot.volumes.filter((volume) => !volume.used).length,
-                        networkCount: snapshot.networks.filter((network) => !network.builtIn).length,
+                        networkCount: snapshot.networks.length,
                         unusedNetworkCount: snapshot.networks.filter((network) => !network.builtIn && !network.used).length,
+                    },
+                    resources: {
+                        containers: snapshot.containers.slice(0, 8).map((container) => ({
+                            name: container.name,
+                            query: container.id,
+                            used: container.state === "running",
+                        })),
+                        images: snapshot.images.slice(0, 8).map((image) => ({
+                            name: image.reference,
+                            used: image.used,
+                        })),
+                        volumes: snapshot.volumes.slice(0, 8).map((volume) => ({
+                            name: volume.name,
+                            used: volume.used,
+                        })),
+                        networks: snapshot.networks.slice(0, 8).map((network) => ({
+                            name: network.name,
+                            used: network.used,
+                            builtIn: network.builtIn,
+                        })),
                     },
                 }, callback);
             } catch (e) {
@@ -292,7 +447,7 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
         agentSocket.on("removeDockerNetwork", async (id : unknown, callback) => {
             try {
                 checkLogin(socket);
-                await removeNetwork(requireString(id, "Network ID"));
+                await removeNetwork(requireString(id, "Network ID"), server.stacksDir);
                 callbackResult({ ok: true,
                     msg: "Network removed" }, callback);
             } catch (e) {
@@ -304,7 +459,7 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             try {
                 checkLogin(socket);
                 const include = requireBoolean(includeCompose, "includeCompose");
-                const result = await pruneNetworks(include);
+                const result = await pruneNetworks(include, server.stacksDir);
                 callbackResult({ ok: true,
                     ...result }, callback);
             } catch (e) {
@@ -333,55 +488,73 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             }
         });
 
-        // Merge attaches the containers of the source networks to the target network.
-        // Containers stay on their original networks, so the merge is additive and
-        // reversible; the compose snippet returned by the client makes it permanent.
+        // Build Compose changes for every managed service on the selected source networks.
         agentSocket.on("mergeDockerNetworks", async (payload : unknown, callback) => {
             try {
                 checkLogin(socket);
-
                 if (typeof payload !== "object" || payload === null) {
                     throw new ValidationError("Invalid merge data");
                 }
-
-                const data = payload as { target? : unknown, sources? : unknown };
-                const target = requireString(data.target, "Target network");
-
-                if (!Array.isArray(data.sources) || data.sources.length === 0) {
+                const data = payload as { target? : unknown, sources? : unknown, apply? : unknown, expectedHashes? : unknown };
+                const targetName = requireString(data.target, "Target network");
+                if (!Array.isArray(data.sources) || data.sources.length === 0 || !data.sources.every((item) => typeof item === "string")) {
                     throw new ValidationError("Select at least one network to merge");
                 }
-
-                const sources = data.sources
-                    .filter((item) : item is string => typeof item === "string" && item.trim() !== "")
-                    .map((item) => item.trim());
-
+                const sourceNames = data.sources as string[];
                 const containers = await listContainers();
                 const networks = await listNetworks(containers);
-                const containerNames : string[] = [];
-
-                for (const source of sources) {
-                    if (source === target) {
-                        continue;
-                    }
-
-                    const network = networks.find((item) => item.name === source);
-
-                    if (!network) {
-                        continue;
-                    }
-
-                    for (const container of network.containers) {
-                        if (!containerNames.includes(container.name)) {
-                            containerNames.push(container.name);
-                        }
+                const target = networks.find((item) => item.name === targetName);
+                if (!target || target.builtIn) {
+                    throw new ValidationError("Target network is unavailable");
+                }
+                const selected = networks.filter((item) => sourceNames.includes(item.name) && item.name !== targetName);
+                if (selected.length !== new Set(sourceNames).size) {
+                    throw new ValidationError("Source network is unavailable");
+                }
+                const members = new Map<string, typeof containers[number]>();
+                for (const source of selected) {
+                    for (const member of containers.filter((item) => item.networks.includes(source.name))) {
+                        members.set(member.id, member);
                     }
                 }
-
-                const result = await connectContainers(target, containerNames);
-
+                const plans : { stack : string, original : string, updated : string, filePath : string }[] = [];
+                for (const member of members.values()) {
+                    if (!member.stack || !member.service || !/^[a-z0-9_-]+$/.test(member.stack)
+                        || !await Stack.composeFileExists(server.stacksDir, member.stack)) {
+                        throw new ValidationError(`Container ${member.name} is not in a managed Compose stack`);
+                    }
+                    const rootPath = await realpath(server.stacksDir);
+                    const stackPath = await realpath(path.join(server.stacksDir, member.stack));
+                    if (path.dirname(stackPath) !== rootPath) {
+                        throw new ValidationError("Invalid stack path");
+                    }
+                    let plan = plans.find((item) => item.stack === member.stack);
+                    if (!plan) {
+                        const stack = await Stack.getStack(server, member.stack);
+                        plan = { stack: member.stack,
+                            original: stack.composeYAML,
+                            updated: stack.composeYAML,
+                            filePath: stack.composeFilePath };
+                        plans.push(plan);
+                    }
+                    plan.updated = addServiceNetwork(plan.updated, member.stack, member.service, target);
+                }
+                if (data.apply === true) {
+                    const expected = data.expectedHashes as Record<string, string> | null;
+                    if (!expected || plans.some((plan) => expected[plan.stack] !== composeHash(plan.original))) {
+                        throw new ValidationError("A Compose file changed after the preview. Preview the changes again.");
+                    }
+                    for (const plan of plans) {
+                        await saveServiceNetwork(plan.filePath, plan.original, plan.updated, true);
+                    }
+                    server.sendStackList().catch((e) => log.warn("network", String(e)));
+                }
                 callbackResult({ ok: true,
-                    msg: `${result.connected.length} container(s) joined ${target}`,
-                    ...result }, callback);
+                    msg: data.apply === true ? "networkComposeSynced" : "networkComposePreview",
+                    msgi18n: true,
+                    plans: plans.map(({ stack, original, updated }) => ({ stack,
+                        composeHash: composeHash(original),
+                        composeYAML: updated })) }, callback);
             } catch (e) {
                 callbackError(e, callback);
             }
@@ -395,9 +568,11 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             try {
                 checkLogin(socket);
                 const list = await Registry.getRegistryList();
+                const sources = await getDockerRegistrySources();
                 callbackResult({
                     ok: true,
                     registries: list.map((registry) => registry.toJSON()),
+                    sources,
                 }, callback);
             } catch (e) {
                 callbackError(e, callback);

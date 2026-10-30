@@ -499,8 +499,9 @@ export default {
                 composeYAML,
                 composeENV,
                 isManagedByDockcg: true,
-                endpoint: "",
+                endpoint: this.$root.composeTemplateEndpoint || "",
             };
+            this.$root.composeTemplateEndpoint = "";
 
             this.yamlCodeChange();
 

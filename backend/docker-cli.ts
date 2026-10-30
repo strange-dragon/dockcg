@@ -80,7 +80,7 @@ export function parseJSONLines<T>(stdout : string) : T[] {
         try {
             result.push(JSON.parse(trimmed) as T);
         } catch (e) {
-            // Ignore partial lines and non-JSON output
+            throw new Error("Failed to parse Docker JSON output");
         }
     }
 

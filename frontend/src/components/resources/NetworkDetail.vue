@@ -16,62 +16,42 @@
                 <button class="btn btn-dark" :disabled="busy" @click="load">
                     <font-awesome-icon icon="arrows-rotate" :spin="busy" /> {{ $t("refresh") }}
                 </button>
-                <button class="btn btn-danger" :disabled="network.used || network.builtIn || busy" :title="deleteTitle" @click="$refs.confirm.show()">
+                <button class="btn btn-danger" :disabled="network.used || network.builtIn || !!network.stack || busy" :title="deleteTitle" @click="$refs.confirm.show()">
                     <font-awesome-icon icon="trash" /> {{ $t("delete") }}
                 </button>
             </div>
             <div class="note">{{ $t("networkDetailNote") }}</div>
 
-            <section>
-                <h2 class="section-title">{{ $t("topology") }}</h2>
-                <div class="card topology-card">
-                    <svg viewBox="0 0 880 268" role="img" :aria-label="$t('topology')">
-                        <!-- host -->
-                        <rect x="372" y="10" width="136" height="42" rx="10" class="node" />
-                        <text x="440" y="28" text-anchor="middle" class="node-title">docker host</text>
-                        <text x="440" y="43" text-anchor="middle" class="node-sub">unix:///var/run</text>
-
-                        <!-- host -> other networks -->
-                        <path
-                            v-for="other in topology.others" :key="`l-${other.name}`"
-                            :d="`M440 52 C440 82 ${other.x + (other.w / 2)} 74 ${other.x + (other.w / 2)} 102`"
-                            fill="none" stroke="#2f3b49" stroke-width="1.3" stroke-dasharray="4 4"
-                        />
-                        <path d="M440 52 L440 98" fill="none" stroke="#74c2ff" stroke-width="1.8" />
-
-                        <!-- other networks -->
-                        <g v-for="other in topology.others" :key="`n-${other.name}`" opacity=".62">
-                            <rect :x="other.x" y="102" :width="other.w" height="44" rx="9" class="node-dim" />
-                            <text :x="other.x + (other.w / 2)" y="121" text-anchor="middle" class="node-title">{{ other.label }}</text>
-                            <text :x="other.x + (other.w / 2)" y="136" text-anchor="middle" class="node-sub">{{ other.subnet || $t("unused") }}</text>
-                        </g>
-
-                        <!-- current network -->
-                        <rect x="356" y="98" width="168" height="52" rx="10" fill="rgba(116,194,255,.10)" stroke="#74c2ff" stroke-width="1.6" />
-                        <text x="440" y="118" text-anchor="middle" fill="#8fc9ff" font-size="12.5" font-weight="600">{{ network.name }}</text>
-                        <text x="440" y="133" text-anchor="middle" fill="#6f93ad" font-size="9.5" class="mono">{{ network.driver }} · {{ network.subnet || "-" }}</text>
-                        <rect x="424" y="86" width="52" height="16" rx="50" fill="#74c2ff" />
-                        <text x="450" y="97.5" text-anchor="middle" fill="#020b05" font-size="9.5" font-weight="700">{{ $t("current") }}</text>
-
-                        <!-- containers -->
-                        <path
-                            v-for="container in topology.containers" :key="`cl-${container.name}`"
-                            :d="`M440 150 C440 178 ${container.center} 172 ${container.center} 196`"
-                            fill="none" stroke="#74c2ff" stroke-width="1.6" opacity=".8"
-                        />
-                        <g v-for="container in topology.containers" :key="`c-${container.name}`">
-                            <rect :x="container.x" y="196" :width="container.w" height="52" rx="9" class="node" />
-                            <text :x="container.center" y="216" text-anchor="middle" class="node-title">{{ container.name }}</text>
-                            <text :x="container.center" y="231" text-anchor="middle" class="node-sub">{{ container.stack || container.service || "-" }}</text>
-                        </g>
-                    </svg>
-
-                    <div class="topology-legend">
-                        <span><i class="line current"></i>{{ $t("currentNetwork") }}</span>
-                        <span><i class="line host"></i>{{ $t("hostToOtherNetworks") }}</span>
-                        <span><i class="line none"></i>{{ $t("noContainersAttached") }}</span>
+            <section class="relation-section">
+                <h2 class="section-title">{{ $t("networkRelations") }}</h2>
+                <p class="note">{{ $t("networkRelationHint") }}</p>
+                <div class="relation-grid">
+                    <div class="card relation-panel">
+                        <h3>{{ $t("availableContainers") }}</h3>
+                        <p class="relation-help">{{ $t("dragContainerHint") }}</p>
+                        <div v-if="availableContainers.length === 0" class="relation-empty">{{ $t("noAvailableContainers") }}</div>
+                        <div v-for="entry in availableContainers" :key="entry.id" class="relation-container" draggable="true" @dragstart="onDragStart($event, entry)" @dragend="onDragEnd">
+                            <div class="relation-name">{{ entry.name }}</div>
+                            <div class="relation-sub">{{ entry.source }}<span v-if="entry.stack"> · {{ entry.stack }}</span></div>
+                            <button class="btn btn-sm btn-outline-primary" type="button" :disabled="busy || network.builtIn" @click="entry.stack && entry.service ? connectContainer(entry.id) : showSnippet = true">
+                                {{ $t(entry.stack && entry.service ? "previewComposeChange" : "viewComposeSnippet") }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card relation-panel relation-target" :class="{ 'drag-over': dragOver && !network.builtIn }" @dragover.prevent="onDragOver" @dragleave="dragOver = false" @drop.prevent="onDrop">
+                        <h3>{{ network.name }}</h3>
+                        <p class="relation-help">{{ $t(network.builtIn ? "builtInNetworkMsg" : "dropContainerHint") }}</p>
+                        <div v-if="network.containers.length === 0" class="relation-empty">{{ $t("noContainerUsesNetwork") }}</div>
+                        <div v-for="container in network.containers" :key="container.id" class="relation-container attached">
+                            <div class="relation-name">{{ container.name }}</div>
+                            <div class="relation-sub">{{ container.stack || $t("noStack") }}<span v-if="container.service"> / {{ container.service }}</span></div>
+                        </div>
                     </div>
                 </div>
+                <p class="relation-warning">{{ $t("networkAutoComposeHint") }}</p>
+                <p v-if="lastConnection !== null" class="relation-warning text-success">
+                    {{ $t("networkComposeSynced") }}
+                </p>
             </section>
 
             <div class="detail-grid">
@@ -89,7 +69,7 @@
                                     </div>
                                 </div>
                                 <div class="crow-right">
-                                    <span class="badge" :class="container.state === 'running' ? 'bg-primary' : 'bg-secondary'">{{ container.state }}</span>
+                                    <span class="badge" :class="container.state === 'running' ? 'bg-primary' : 'bg-secondary'">{{ $te(`dockerState.${container.state}`) ? $t(`dockerState.${container.state}`) : container.state }}</span>
                                 </div>
                             </div>
                             <div v-if="network.containers.length === 0" class="crow">
@@ -147,6 +127,14 @@
             <pre class="snippet">{{ consumerSnippet }}</pre>
         </BModal>
 
+        <BModal v-model="showComposePreview" :title="$t('networkComposePreview')" :ok-title="$t('saveComposeChanges')" :ok-disabled="busy" @ok="applyComposeChange">
+            <p class="small text-muted">{{ $t('networkComposeDeployHint') }}</p>
+            <div v-for="plan in composePlans" :key="plan.stack">
+                <strong>{{ plan.stack }}/compose.yaml</strong>
+                <pre class="snippet migration-preview">{{ plan.composeYAML }}</pre>
+            </div>
+        </BModal>
+
         <Confirm ref="confirm" :yes-text="$t('yes')" :no-text="$t('no')" btn-style="btn-danger" @yes="doRemove">
             {{ $t("confirmRemoveNetwork") }}
         </Confirm>
@@ -172,11 +160,17 @@ export default {
         return {
             networks: [],
             loading: false,
+            requestId: 0,
             busy: false,
             merging: false,
             showMerge: false,
             showSnippet: false,
             mergeSelection: [],
+            dragOver: false,
+            lastConnection: null,
+            showComposePreview: false,
+            composePlans: [],
+            pendingComposeAction: null,
         };
     },
 
@@ -219,6 +213,9 @@ export default {
             if (this.network.builtIn) {
                 return this.$t("builtInNetworkMsg");
             }
+            if (this.network.stack) {
+                return this.$t("composeNetworkProtected");
+            }
             return this.network.used ? this.$t("networkAttachedMsg") : this.$t("delete");
         },
 
@@ -229,58 +226,38 @@ export default {
             return this.networks.filter((item) => item.name !== this.network.name && !item.builtIn && item.used);
         },
 
-        topology() {
-            const others = this.networks
-                .filter((item) => this.network && item.name !== this.network.name)
-                .slice(0, 4);
+        availableContainers() {
+            if (!this.network) {
+                return [];
+            }
 
-            const slots = [
-                { x: 34,
-                    w: 108 },
-                { x: 180,
-                    w: 112 },
-                { x: 596,
-                    w: 144 },
-                { x: 736,
-                    w: 112 },
-            ];
+            const attached = new Set(this.network.containers.map((container) => container.id));
+            const available = new Map();
 
-            const otherNodes = others.map((item, index) => ({
-                name: item.name,
-                label: item.name.length > 18 ? `${item.name.substring(0, 17)}…` : item.name,
-                subnet: item.subnet,
-                x: slots[index].x,
-                w: slots[index].w,
-            }));
+            for (const network of this.networks) {
+                if (network.name === this.network.name) {
+                    continue;
+                }
+                for (const container of network.containers) {
+                    if (!attached.has(container.id) && !available.has(container.id)) {
+                        available.set(container.id, { ...container,
+                            source: network.name });
+                    }
+                }
+            }
 
-            const containers = (this.network ? this.network.containers : []).slice(0, 3);
-            const widths = [ 150, 160, 150 ];
-            const starts = [ 298, 458, 634 ];
-
-            const containerNodes = containers.map((container, index) => ({
-                name: container.name.length > 20 ? `${container.name.substring(0, 19)}…` : container.name,
-                stack: container.stack,
-                service: container.service,
-                x: starts[index],
-                w: widths[index],
-                center: starts[index] + (widths[index] / 2),
-            }));
-
-            return {
-                others: otherNodes,
-                containers: containerNodes,
-            };
+            return Array.from(available.values()).sort((a, b) => a.name.localeCompare(b.name));
         },
 
         providerSnippet() {
             const name = this.network ? this.network.name : "network";
             const driver = this.network ? this.network.driver : "bridge";
-            return `networks:\n  ${name}:\n    driver: ${driver}\n    name: ${name}`;
+            return `services:\n  <service>:\n    networks:\n      - ${name}\n\nnetworks:\n  ${name}:\n    driver: ${driver}\n    name: ${name}`;
         },
 
         consumerSnippet() {
             const name = this.network ? this.network.name : "network";
-            return `networks:\n  ${name}:\n    external: true`;
+            return `services:\n  <service>:\n    networks:\n      - ${name}\n\nnetworks:\n  ${name}:\n    external: true\n    name: ${name}`;
         },
     },
 
@@ -289,6 +266,7 @@ export default {
             this.load();
         },
         endpoint() {
+            this.lastConnection = null;
             this.load();
         },
     },
@@ -299,15 +277,67 @@ export default {
 
     methods: {
         load() {
+            const requestId = ++this.requestId;
             this.loading = true;
+            this.networks = [];
 
             this.$root.emitAgent(this.endpoint, "getDockerNetworkResourceList", (res) => {
+                if (requestId !== this.requestId) {
+                    return;
+                }
                 this.loading = false;
 
                 if (res.ok) {
                     this.networks = res.networks;
                 } else {
                     this.$root.toastRes(res);
+                }
+            });
+        },
+
+        onDragStart(event, entry) {
+            event.dataTransfer.effectAllowed = "copy";
+            event.dataTransfer.setData("text/plain", entry.id);
+        },
+
+        onDragEnd() {
+            this.dragOver = false;
+        },
+
+        onDragOver(event) {
+            if (!this.network?.builtIn) {
+                this.dragOver = true;
+                event.dataTransfer.dropEffect = "copy";
+            }
+        },
+
+        onDrop(event) {
+            this.dragOver = false;
+            if (!this.network?.builtIn) {
+                this.connectContainer(event.dataTransfer.getData("text/plain"));
+            }
+        },
+
+        connectContainer(containerId) {
+            if (!this.network || this.network.builtIn || this.busy || !this.availableContainers.some((item) => item.id === containerId)) {
+                return;
+            }
+
+            this.busy = true;
+            this.$root.emitAgent(this.endpoint, "connectDockerContainerNetwork", {
+                network: this.network.name,
+                containerId,
+            }, (res) => {
+                this.busy = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.pendingComposeAction = { event: "connectDockerContainerNetwork",
+                        payload: { network: this.network.name,
+                            containerId } };
+                    this.composePlans = [{ stack: res.stack,
+                        composeHash: res.composeHash,
+                        composeYAML: res.composeYAML }];
+                    this.showComposePreview = true;
                 }
             });
         },
@@ -328,8 +358,31 @@ export default {
 
                 if (res.ok) {
                     this.showMerge = false;
+                    this.pendingComposeAction = { event: "mergeDockerNetworks",
+                        payload: { target: this.network.name,
+                            sources: [ ...this.mergeSelection ] } };
+                    this.composePlans = res.plans;
+                    this.showComposePreview = true;
+                }
+            });
+        },
+
+        applyComposeChange() {
+            if (!this.pendingComposeAction) {
+                return;
+            }
+            this.busy = true;
+            const expectedHashes = Object.fromEntries(this.composePlans.map((plan) => [ plan.stack, plan.composeHash ]));
+            this.$root.emitAgent(this.endpoint, this.pendingComposeAction.event, { ...this.pendingComposeAction.payload,
+                apply: true,
+                expectedHashes,
+                expectedHash: this.composePlans[0]?.composeHash }, (res) => {
+                this.busy = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.showComposePreview = false;
                     this.mergeSelection = [];
-                    this.showSnippet = true;
+                    this.lastConnection = true;
                     this.load();
                 }
             });
@@ -364,67 +417,53 @@ export default {
 <style lang="scss" scoped>
 @import "../../styles/resource-detail.scss";
 
-.topology-card {
-    padding: 14px 10px 6px;
-
-    svg {
-        width: 100%;
-        height: auto;
-        display: block;
-    }
-}
-
-.node {
-    fill: #161b22;
-    stroke: #2a3441;
-}
-
-.node-dim {
-    fill: #0d1117;
-    stroke: #24303d;
-}
-
-.node-title {
-    fill: #dbe3eb;
-    font-size: 11.5px;
-}
-
-.node-sub {
-    fill: #5f6b76;
-    font-size: 9.5px;
-    font-family: "JetBrains Mono", Menlo, monospace;
-}
-
-.topology-legend {
-    display: flex;
-    flex-wrap: wrap;
+.relation-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
-    margin-top: 8px;
-    font-size: 11.5px;
-    color: var(--muted);
 
-    .line {
-        display: inline-block;
-        width: 18px;
-        height: 0;
-        margin-right: 6px;
-        vertical-align: middle;
-        border-top: 2px solid #2f3b49;
-
-        &.current {
-            border-color: #74c2ff;
-        }
-
-        &.host {
-            border-top-style: dashed;
-        }
-
-        &.none {
-            border-top-style: dashed;
-            opacity: 0.5;
-        }
+    @media (max-width: 760px) {
+        grid-template-columns: 1fr;
     }
 }
+
+.relation-panel {
+    min-width: 0;
+    padding: 14px 16px;
+
+    h3 {
+        font-size: 17px;
+        margin: 0 0 4px;
+        color: var(--strong);
+    }
+}
+
+.relation-help, .relation-empty, .relation-warning {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.relation-help { margin-bottom: 12px; }
+.relation-empty { padding: 15px 0; }
+.relation-warning { margin: 10px 0 0; }
+.relation-target { border: 1px dashed var(--card-border); }
+.relation-target.drag-over { border-color: #74c2ff; background: var(--panel-bg); }
+
+.relation-container {
+    position: relative;
+    padding: 10px 12px;
+    margin-top: 8px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: var(--panel-bg);
+    cursor: grab;
+
+    &.attached { cursor: default; }
+    .btn { margin-top: 8px; }
+}
+
+.relation-name { font-size: 14px; font-weight: 600; color: var(--strong); word-break: break-all; }
+.relation-sub { font-size: 13px; color: var(--muted); word-break: break-all; }
 
 .merge-item {
     display: flex;

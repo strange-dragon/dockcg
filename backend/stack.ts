@@ -12,7 +12,6 @@ import {
     CREATED_STACK,
     EXITED, getCombinedTerminalName,
     getComposeTerminalName, getContainerExecTerminalName,
-    PROGRESS_TERMINAL_ROWS,
     RUNNING, TERMINAL_ROWS,
     UNKNOWN
 } from "../common/util-common";
@@ -154,6 +153,10 @@ export class Stack {
 
     get path() : string {
         return path.join(this.server.stacksDir, this.name);
+    }
+
+    get composeFilePath() : string {
+        return path.join(this.path, this._composeFileName);
     }
 
     get fullPath() : string {

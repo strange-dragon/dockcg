@@ -2,8 +2,8 @@
     <div class="resource-detail">
         <template v-if="volume">
             <div class="detail-head">
-                <span class="badge badge-lg" :class="volume.used ? 'bg-primary' : 'bg-warning'">
-                    {{ volume.used ? $t("mounted") : $t("orphaned") }}
+                <span class="badge badge-lg" :class="volume.used ? 'bg-primary' : volume.stack ? 'bg-secondary' : 'bg-warning'">
+                    {{ volume.used ? $t("mounted") : volume.stack ? $t("composeOwned") : $t("orphaned") }}
                 </span>
                 <h1 class="detail-title">{{ volume.name }}</h1>
             </div>
@@ -15,7 +15,7 @@
                 <button class="btn btn-dark" :disabled="busy" @click="load">
                     <font-awesome-icon icon="arrows-rotate" :spin="busy" /> {{ $t("refresh") }}
                 </button>
-                <button class="btn btn-danger" :disabled="volume.used || busy" :title="volume.used ? $t('volumeMountedMsg') : $t('delete')" @click="$refs.confirm.show()">
+                <button class="btn btn-danger" :disabled="volume.used || volume.stack || busy" :title="volume.stack ? $t('composeVolumeProtected') : volume.used ? $t('volumeMountedMsg') : $t('delete')" @click="$refs.confirm.show()">
                     <font-awesome-icon icon="trash" /> {{ $t("delete") }}
                 </button>
             </div>
@@ -36,7 +36,7 @@
                                     </div>
                                 </div>
                                 <div class="crow-right">
-                                    <span class="badge" :class="container.state === 'running' ? 'bg-primary' : 'bg-secondary'">{{ container.state }}</span>
+                                    <span class="badge" :class="container.state === 'running' ? 'bg-primary' : 'bg-secondary'">{{ $te(`dockerState.${container.state}`) ? $t(`dockerState.${container.state}`) : container.state }}</span>
                                 </div>
                             </div>
                             <div v-if="volume.containers.length === 0" class="crow">
@@ -74,6 +74,13 @@
                                 </div>
                             </div>
                             <div class="kv-row"><div class="kv-k">{{ $t("created") }}</div><div class="kv-v">{{ volume.createdText || "-" }}</div></div>
+                            <div class="kv-row">
+                                <div class="kv-k">{{ $t("diskUsage") }}</div>
+                                <div class="kv-v">
+                                    {{ usageText || $t("notCalculated") }}
+                                    <button class="btn btn-link btn-sm" :disabled="usageLoading" @click="loadUsage">{{ $t("calculate") }}</button>
+                                </div>
+                            </div>
                             <div class="kv-row"><div class="kv-k">{{ $t("labels") }}</div><div class="kv-v mono">{{ labelText }}</div></div>
                         </div>
                     </section>
@@ -99,10 +106,7 @@
 
             <label class="form-label">{{ $t("targetVolume") }}</label>
             <input v-model="migrateForm.target" class="form-control mb-2" autocomplete="off" />
-            <div class="form-check mb-2">
-                <input id="keep-source" v-model="migrateForm.keepSource" class="form-check-input" type="checkbox" />
-                <label class="form-check-label" for="keep-source">{{ $t("keepSource") }}</label>
-            </div>
+            <p class="small text-muted">{{ $t("migrationKeepsSource") }}</p>
 
             <div v-if="volume && volume.used" class="notice">
                 <font-awesome-icon icon="circle-info" class="me-2" />
@@ -135,12 +139,14 @@ export default {
         return {
             volumes: [],
             loading: false,
+            requestId: 0,
             busy: false,
             migrating: false,
             showMigrate: false,
+            usageLoading: false,
+            usageText: "",
             migrateForm: {
                 target: "",
-                keepSource: true,
             },
         };
     },
@@ -197,10 +203,29 @@ export default {
     },
 
     methods: {
+        loadUsage() {
+            if (!this.volume) {
+                return;
+            }
+            this.usageLoading = true;
+            this.$root.emitAgent(this.endpoint, "getDockerVolumeUsage", this.volume.name, (res) => {
+                this.usageLoading = false;
+                if (res?.ok) {
+                    this.usageText = res.sizeText;
+                } else {
+                    this.$root.toastRes(res);
+                }
+            });
+        },
         load() {
+            const requestId = ++this.requestId;
             this.loading = true;
+            this.volumes = [];
 
             this.$root.emitAgent(this.endpoint, "getDockerVolumeList", (res) => {
+                if (requestId !== this.requestId) {
+                    return;
+                }
                 this.loading = false;
 
                 if (res.ok) {
@@ -229,7 +254,7 @@ export default {
             this.$root.emitAgent(this.endpoint, "migrateDockerVolume", {
                 source: this.volume.name,
                 target: this.migrateForm.target,
-                keepSource: this.migrateForm.keepSource,
+                keepSource: true,
                 driver: this.volume.driver,
             }, (res) => {
                 this.migrating = false;

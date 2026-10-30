@@ -167,7 +167,7 @@ async function ensureHelperImage() : Promise<void> {
 
 /**
  * Copy the content of a volume into another (existing or freshly created) volume.
- * The source volume is left untouched unless `keepSource` is false.
+ * The source volume is always preserved so a failed or partial copy cannot destroy data.
  */
 export async function migrateVolume(source : string, target : string, options : { keepSource? : boolean, driver? : string } = {}) : Promise<{ target : string, kept : boolean }> {
     const sourceName = assertName(source, "source volume");
@@ -176,6 +176,19 @@ export async function migrateVolume(source : string, target : string, options : 
 
     if (sourceName === targetName) {
         throw new ValidationError("The target volume must be different from the source");
+    }
+
+    if (options.keepSource === false) {
+        throw new ValidationError("The source volume must be kept during migration");
+    }
+
+    const sourceInspect = await dockerExec([ "volume", "inspect", sourceName ]);
+    if (sourceInspect.exitCode !== 0) {
+        throw new ValidationError("Source volume not found");
+    }
+    const targetInspect = await dockerExec([ "volume", "inspect", targetName ]);
+    if (targetInspect.exitCode === 0) {
+        throw new ValidationError("Target volume already exists. Choose a new empty volume name.");
     }
 
     await ensureHelperImage();
@@ -192,28 +205,16 @@ export async function migrateVolume(source : string, target : string, options : 
         "-v", `${sourceName}:/from:ro`,
         "-v", `${targetName}:/to`,
         HELPER_IMAGE,
-        "sh", "-c", "cd /from && cp -a . /to/ 2>/dev/null; echo __DOCKCG_COPY_DONE__",
+        "sh", "-c", "set -e; cd /from; cp -a . /to/",
     ]);
 
-    if (copy.exitCode !== 0 || !copy.stdout.includes("__DOCKCG_COPY_DONE__")) {
+    if (copy.exitCode !== 0) {
         throw new Error(copy.stderr || "Copy failed");
-    }
-
-    const keep = options.keepSource !== false;
-
-    if (!keep) {
-        const remove = await dockerExec([ "volume", "rm", sourceName ]);
-
-        if (remove.exitCode !== 0) {
-            log.warn("docker-resource-actions", `Migrated ${sourceName} but could not remove the source: ${remove.stderr}`);
-            return ({ target: targetName,
-                kept: true });
-        }
     }
 
     return ({
         target: targetName,
-        kept: keep,
+        kept: true,
     });
 }
 
@@ -246,4 +247,15 @@ export async function connectContainers(target : string, containers : string[]) 
 
     return ({ connected,
         skipped });
+}
+
+/** Attach one existing container to one existing network. */
+export async function connectContainerToNetwork(networkName : string, containerId : string) : Promise<void> {
+    const network = assertName(networkName, "network name");
+    const container = assertName(containerId, "container id");
+    const res = await dockerExec([ "network", "connect", network, container ]);
+
+    if (res.exitCode !== 0) {
+        throw new Error(res.stderr || `Unable to connect ${container} to ${network}`);
+    }
 }

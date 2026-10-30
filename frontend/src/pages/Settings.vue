@@ -86,6 +86,9 @@ export default {
                 globalEnv: {
                     title: this.$t("GlobalEnv"),
                 },
+                agents: {
+                    title: this.$tc("dockcgAgent", 2),
+                },
                 registries: {
                     title: this.$t("registries"),
                 },

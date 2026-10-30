@@ -21,10 +21,10 @@ Everything upstream does still works the same way — the stack list, the intera
 | | Dockge (upstream) | Dockcg (this fork) |
 |---|---|---|
 | Scope | `compose.yaml` lifecycle | `compose.yaml` **+ images / volumes / networks / registries** |
-| Navigation | Stack list only | Left sidebar switches between Stacks, Images, Volumes, Networks; a click opens the matching detail page |
+| Navigation | Stack list only | Stacks link plus four Resources tabs: Containers, Images, Volumes and Networks; registry sources appear on Home |
 | Image handling | Pull/update through the stack | Inventory with in-use / unused / dangling state, pre-pull with live progress, targeted delete, prune of unused + dangling |
-| Volumes | Owned silently by compose | Mountpoint, driver, scope, owning stack + service, orphan cleanup, **migration to another volume** |
-| Networks | Not exposed | bridge/overlay/host inventory, **topology diagram**, cross-stack `external: true` snippet generator, **merge into a shared network** |
+| Volumes | Owned silently by compose | Mountpoint, driver, scope, owning stack + service, orphan cleanup, **copy to another volume** |
+| Networks | Not exposed | bridge/overlay/host inventory, **draggable relationship view**, cross-stack `external: true` snippet generator, **merge into a shared network** |
 | Private registries | Not exposed | Docker Hub / ghcr.io / Harbor credentials, `docker login` in the background, password encrypted at rest |
 | Language | 30+ locales | English + Simplified Chinese only (English by default) |
 | Branding | `DOCKGE_*` env, `dockge.db`, `louislam/dockge` images | `DOCKCG_*` env, `dockcg.db`, `strange-dragon/dockcg` — nothing is pulled from the upstream Docker Hub namespace |
@@ -42,13 +42,15 @@ Three rules shape the whole resources module. They are enforced in code, not jus
 
 ## Screenshots
 
+These screenshots predate the network relationship view and show the previous page layout.
+
 | Images | Volumes |
 |---|---|
 | ![Image detail: containers using it, layers, digest, platform](./docs/screenshots/images.png) | ![Volume detail: mountpoint, owning stack, migration](./docs/screenshots/volumes.png) |
 
 | Networks | Stacks |
 |---|---|
-| ![Network detail: topology, connected containers, merge and share](./docs/screenshots/networks.png) | ![Stack detail: containers, terminal, compose.yaml](./docs/screenshots/stacks.png) |
+| ![Previous network detail](./docs/screenshots/networks.png) | ![Stack detail: containers, terminal, compose.yaml](./docs/screenshots/stacks.png) |
 
 ## Features
 
@@ -67,11 +69,15 @@ Three rules shape the whole resources module. They are enforced in code, not jus
 
 **Images** — tag, size, created, resolved in-use / unused / dangling state from `com.docker.compose.project` labels, the containers that use the image, all tags sharing the same image ID, digest, platform, entrypoint, exposed ports, pre-pull with live terminal progress, targeted delete, prune of unused or dangling images.
 
-**Volumes** — mountpoint, driver, scope, labels, owning stack + service, attached containers, generated `compose.yaml` snippet, orphan cleanup, and **migration**: the content is copied into a new or existing volume by a short-lived `alpine:3` container, and you point `compose.yaml` at the new volume afterwards. Migration is refused while a container still mounts the source.
+**Volumes** — mountpoint, driver, scope, labels, owning stack + service, attached containers, generated `compose.yaml` snippet, orphan cleanup, and **migration**: the content is copied into a new empty volume by a short-lived `alpine:3` helper. The source is always kept. Update `compose.yaml` after checking the copy. Migration is refused while a container still mounts the source. Disk usage is calculated on demand.
 
-**Networks** — driver, subnet, scope, internal flag, attached containers, a **topology diagram** (host → networks → containers, current network highlighted), a provider/consumer `external: true` snippet, cleanup, and **merge**: the containers of the selected networks also join the target network via `docker network connect`, so they reach each other by container name while the original networks stay untouched.
+**Networks** — driver, subnet, scope, internal flag, attached containers and a draggable relationship view. Dragging a managed service or selecting several source networks previews changes to the affected Compose files. The server validates and saves the files; deploy the stacks to apply the changes. Unmanaged services use the generated `external: true` snippet. Unused network cleanup protects names declared in managed Compose files.
 
-**Registries** (`Settings → Registries`) — Docker Hub, ghcr.io or a private Harbor; `docker login` runs in the background, the password is encrypted with AES-256-GCM (key derived from the server secret) and never returned to the browser. Credentials land in the container's `~/.docker/config.json`, so either mount that path or re-run *Sync all* after recreating the container.
+**Registries** (`Home`, with management in `Settings → Registries`) — shows login source names from the Docker config visible to Dockcg and mirrors from the daemon. Source entries do not prove credentials are still valid. Saved credentials are encrypted at rest, synced with `docker login` and restored after server restart; failures can be retried with *Sync all*.
+
+**Agent management** (`Settings → Agents`) — add, rename and remove remote Dockcg agents; this was moved from the Home page to keep Home focused.
+
+**Container migration** (`Resources → Containers`) — scans every container and generates a Compose draft from its inspect data. The draft includes image, environment, published ports, mounts, restart policy and networks, plus review warnings. The original container is never stopped or deleted. Save the draft first and resolve port conflicts before deploying.
 
 ---
 

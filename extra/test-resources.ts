@@ -347,8 +347,8 @@ volumes:
         !(pruneComposeVolume.removed || []).includes(expectedVolume), JSON.stringify(pruneComposeVolume.removed));
 
     const pruneComposeVolumeOptIn = await agent("pruneDockerVolumes", true);
-    assert("prune removes compose-owned volumes when explicitly opted in",
-        (pruneComposeVolumeOptIn.removed || []).includes(expectedVolume), JSON.stringify(pruneComposeVolumeOptIn.removed));
+    assert("prune protects volumes still declared in managed Compose files even with legacy opt-in",
+        !(pruneComposeVolumeOptIn.removed || []).includes(expectedVolume), JSON.stringify(pruneComposeVolumeOptIn.removed));
 
     // -------------------------------------------------------------- registries
     section("registries");

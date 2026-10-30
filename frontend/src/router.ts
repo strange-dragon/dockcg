@@ -12,15 +12,18 @@ const Settings = () => import("./pages/Settings.vue");
 
 // Resources - detail pages (the list itself lives in the sidebar)
 const ImageDetail = () => import("./components/resources/ImageDetail.vue");
+const ResourcesOverview = () => import("./components/resources/ResourcesOverview.vue");
 const VolumeDetail = () => import("./components/resources/VolumeDetail.vue");
 const NetworkDetail = () => import("./components/resources/NetworkDetail.vue");
 const ResourcesRegistries = () => import("./components/settings/Registries.vue");
+const ContainerMigration = () => import("./components/resources/ContainerMigration.vue");
 
 // Settings - Sub Pages
 import Appearance from "./components/settings/Appearance.vue";
 import General from "./components/settings/General.vue";
 const Security = () => import("./components/settings/Security.vue");
 const GlobalEnv = () => import("./components/settings/GlobalEnv.vue");
+const Agents = () => import("./components/settings/Agents.vue");
 import About from "./components/settings/About.vue";
 
 const routes = [
@@ -71,7 +74,7 @@ const routes = [
                     },
                     {
                         path: "/resources",
-                        redirect: "/resources/images",
+                        component: ResourcesOverview,
                     },
                     {
                         path: "/resources/images",
@@ -84,6 +87,14 @@ const routes = [
                     {
                         path: "/resources/networks",
                         component: NetworkDetail,
+                    },
+                    {
+                        path: "/resources/registries",
+                        redirect: "/settings/registries",
+                    },
+                    {
+                        path: "/resources/containers",
+                        component: ContainerMigration,
                     },
                     {
                         path: "/settings",
@@ -104,6 +115,10 @@ const routes = [
                             {
                                 path: "globalEnv",
                                 component: GlobalEnv,
+                            },
+                            {
+                                path: "agents",
+                                component: Agents,
                             },
                             {
                                 path: "registries",

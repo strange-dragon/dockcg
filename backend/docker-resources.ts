@@ -5,7 +5,7 @@ import {
     parseJSONLines,
     parseLabelString
 } from "./docker-cli";
-import { log } from "./log";
+import { getComposeResourceClaims } from "./compose-resource-claims";
 
 /**
  * Dockcg resource inventory.
@@ -88,6 +88,32 @@ export interface PruneResult {
     failed : { name : string, error : string }[];
     reclaimed : number;
     reclaimedText : string;
+}
+
+export interface PruneCandidate {
+    name : string;
+    size : number;
+}
+
+export async function previewPrune(kind : "images" | "volumes" | "networks", stacksDir : string, mode : "dangling" | "unused" = "dangling") : Promise<PruneCandidate[]> {
+    const containers = await listContainers();
+    if (kind === "images") {
+        return (await listImages(containers))
+            .filter((image) => !image.used && (mode === "unused" || image.dangling))
+            .map((image) => ({ name: image.reference,
+                size: image.size }));
+    }
+    const claims = await getComposeResourceClaims(stacksDir);
+    if (kind === "volumes") {
+        return (await listVolumes(containers))
+            .filter((volume) => !volume.used && !volume.stack && !claims.volumes.has(volume.name) && volume.scope === "local")
+            .map((volume) => ({ name: volume.name,
+                size: 0 }));
+    }
+    return (await listNetworks(containers))
+        .filter((network) => !network.used && !network.builtIn && !network.stack && !claims.networks.has(network.name) && network.scope === "local")
+        .map((network) => ({ name: network.name,
+            size: 0 }));
 }
 
 const BUILT_IN_NETWORKS = [ "bridge", "host", "none" ];
@@ -200,8 +226,7 @@ export async function listContainers() : Promise<DockerContainerInfo[]> {
     try {
         rawList = JSON.parse(inspectRes.stdout) as RawContainer[];
     } catch (e) {
-        log.warn("docker-resources", "Failed to parse `docker container inspect` output");
-        return [];
+        throw new Error("Failed to parse `docker container inspect` output");
     }
 
     return rawList.map((raw) => {
@@ -306,15 +331,17 @@ export async function listVolumes(containers : DockerContainerInfo[]) : Promise<
     if (names.length > 0) {
         const inspectRes = await dockerExec([ "volume", "inspect", ...names ]);
 
-        if (inspectRes.exitCode === 0) {
-            try {
-                const inspected = JSON.parse(inspectRes.stdout) as RawVolumeInspect[];
-                for (const item of inspected) {
-                    inspectMap.set(item.Name, item);
-                }
-            } catch (e) {
-                log.warn("docker-resources", "Failed to parse `docker volume inspect` output");
+        if (inspectRes.exitCode !== 0) {
+            throw new Error(inspectRes.stderr || "Unable to inspect volumes");
+        }
+
+        try {
+            const inspected = JSON.parse(inspectRes.stdout) as RawVolumeInspect[];
+            for (const item of inspected) {
+                inspectMap.set(item.Name, item);
             }
+        } catch (e) {
+            throw new Error("Failed to parse `docker volume inspect` output");
         }
     }
 
@@ -338,6 +365,26 @@ export async function listVolumes(containers : DockerContainerInfo[]) : Promise<
     }).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Docker computes volume usage for `system df -v`; it may be slow on large hosts. */
+export async function getVolumeUsage(name : string) : Promise<string> {
+    const containers = await listContainers();
+    if (!(await listVolumes(containers)).some((volume) => volume.name === name)) {
+        throw new Error("Volume not found");
+    }
+    const result = await dockerExec([ "system", "df", "-v" ]);
+    if (result.exitCode !== 0) {
+        throw new Error(result.stderr || "Unable to calculate volume usage");
+    }
+    const section = result.stdout.split(/Local Volumes space usage:/i)[1]?.split(/Build cache usage:/i)[0] || "";
+    for (const line of section.split("\n")) {
+        const columns = line.trim().split(/\s{2,}/);
+        if (columns[0] === name && columns.length >= 3) {
+            return columns[columns.length - 1];
+        }
+    }
+    throw new Error("Docker did not report usage for this volume");
+}
+
 /**
  * List all networks with stack attribution and attached containers.
  * @param containers result of listContainers()
@@ -356,15 +403,17 @@ export async function listNetworks(containers : DockerContainerInfo[]) : Promise
     if (names.length > 0) {
         const inspectRes = await dockerExec([ "network", "inspect", ...names ]);
 
-        if (inspectRes.exitCode === 0) {
-            try {
-                const inspected = JSON.parse(inspectRes.stdout) as RawNetworkInspect[];
-                for (const item of inspected) {
-                    inspectMap.set(item.Name, item);
-                }
-            } catch (e) {
-                log.warn("docker-resources", "Failed to parse `docker network inspect` output");
+        if (inspectRes.exitCode !== 0) {
+            throw new Error(inspectRes.stderr || "Unable to inspect networks");
+        }
+
+        try {
+            const inspected = JSON.parse(inspectRes.stdout) as RawNetworkInspect[];
+            for (const item of inspected) {
+                inspectMap.set(item.Name, item);
             }
+        } catch (e) {
+            throw new Error("Failed to parse `docker network inspect` output");
         }
     }
 
@@ -515,18 +564,20 @@ export async function removeImage(imageId : string) : Promise<void> {
 
 /**
  * Remove volumes that are not mounted by any container.
- * @param includeCompose when false, volumes created by a compose project are kept (default, safer)
+ * @param includeCompose legacy wire argument; Compose-owned volumes are always protected
  */
-export async function pruneVolumes(includeCompose : boolean) : Promise<PruneResult> {
+export async function pruneVolumes(includeCompose : boolean, stacksDir : string) : Promise<PruneResult> {
+    void includeCompose;
     const result = emptyPruneResult();
     const containers = await listContainers();
     const volumes = await listVolumes(containers);
+    const claims = await getComposeResourceClaims(stacksDir);
 
     const candidates = volumes.filter((volume) => {
         if (volume.used) {
             return false;
         }
-        if (!includeCompose && volume.stack) {
+        if (claims.volumes.has(volume.name) || volume.stack) {
             return false;
         }
         return volume.scope === "local";
@@ -551,7 +602,7 @@ export async function pruneVolumes(includeCompose : boolean) : Promise<PruneResu
 /**
  * Remove one volume. Refuses when it is still mounted.
  */
-export async function removeVolume(name : string) : Promise<void> {
+export async function removeVolume(name : string, stacksDir : string) : Promise<void> {
     const containers = await listContainers();
     const volumes = await listVolumes(containers);
     const target = volumes.find((volume) => volume.name === name);
@@ -564,6 +615,13 @@ export async function removeVolume(name : string) : Promise<void> {
         throw new Error("This volume is mounted by a container. Stop and remove the stack first.");
     }
 
+    if (target.stack) {
+        throw new Error("This volume belongs to a Compose project. Remove its declaration before deleting the volume.");
+    }
+    if ((await getComposeResourceClaims(stacksDir)).volumes.has(name)) {
+        throw new Error("This volume is declared in a managed Compose file.");
+    }
+
     const res = await dockerExec([ "volume", "rm", name ]);
 
     if (res.exitCode !== 0) {
@@ -573,12 +631,14 @@ export async function removeVolume(name : string) : Promise<void> {
 
 /**
  * Remove custom networks that are not used by any container.
- * @param includeCompose when false, networks owned by a compose project are kept (default, safer)
+ * @param includeCompose legacy wire argument; Compose-owned networks are always protected
  */
-export async function pruneNetworks(includeCompose : boolean) : Promise<PruneResult> {
+export async function pruneNetworks(includeCompose : boolean, stacksDir : string) : Promise<PruneResult> {
+    void includeCompose;
     const result = emptyPruneResult();
     const containers = await listContainers();
     const networks = await listNetworks(containers);
+    const claims = await getComposeResourceClaims(stacksDir);
 
     const candidates = networks.filter((network) => {
         if (network.builtIn || network.used) {
@@ -587,7 +647,7 @@ export async function pruneNetworks(includeCompose : boolean) : Promise<PruneRes
         if (network.scope !== "local") {
             return false;
         }
-        if (!includeCompose && network.stack) {
+        if (claims.networks.has(network.name) || network.stack) {
             return false;
         }
         return true;
@@ -612,7 +672,7 @@ export async function pruneNetworks(includeCompose : boolean) : Promise<PruneRes
 /**
  * Remove one network. Built-in networks and networks with attached containers are rejected.
  */
-export async function removeNetwork(id : string) : Promise<void> {
+export async function removeNetwork(id : string, stacksDir : string) : Promise<void> {
     const containers = await listContainers();
     const networks = await listNetworks(containers);
     const target = networks.find((network) => network.id === id || network.id.startsWith(id) || network.name === id);
@@ -627,6 +687,12 @@ export async function removeNetwork(id : string) : Promise<void> {
 
     if (target.used) {
         throw new Error("This network is still used by a container. Remove the stack first.");
+    }
+    if (target.stack) {
+        throw new Error("This network belongs to a Compose project. Remove its declaration before deleting the network.");
+    }
+    if ((await getComposeResourceClaims(stacksDir)).networks.has(target.name)) {
+        throw new Error("This network is declared in a managed Compose file.");
     }
 
     const res = await dockerExec([ "network", "rm", target.id ]);

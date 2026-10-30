@@ -37,7 +37,7 @@
                                     </div>
                                 </div>
                                 <div class="crow-right">
-                                    <span class="badge" :class="container.state === 'running' ? 'bg-primary' : 'bg-secondary'">{{ container.state }}</span>
+                                    <span class="badge" :class="container.state === 'running' ? 'bg-primary' : 'bg-secondary'">{{ $te(`dockerState.${container.state}`) ? $t(`dockerState.${container.state}`) : container.state }}</span>
                                 </div>
                             </div>
                             <div v-if="image.containers.length === 0" class="crow">
@@ -107,6 +107,7 @@ export default {
         return {
             images: [],
             loading: false,
+            requestId: 0,
             busy: false,
             detail: {
                 digest: "",
@@ -192,9 +193,14 @@ export default {
         },
 
         load() {
+            const requestId = ++this.requestId;
             this.loading = true;
+            this.images = [];
 
             this.$root.emitAgent(this.endpoint, "getDockerImageList", (res) => {
+                if (requestId !== this.requestId) {
+                    return;
+                }
                 this.loading = false;
 
                 if (!res.ok) {
@@ -205,16 +211,16 @@ export default {
                 this.images = res.images;
 
                 if (this.image) {
-                    this.loadDetail();
+                    this.loadDetail(requestId);
                 }
             });
         },
 
-        loadDetail() {
+        loadDetail(requestId) {
             const target = this.image.dangling ? this.image.id : `${this.image.repository}:${this.image.tag}`;
 
             this.$root.emitAgent(this.endpoint, "getDockerImageDetail", target, (res) => {
-                if (res.ok) {
+                if (requestId === this.requestId && res.ok) {
                     this.detail = res.detail;
                 }
             });

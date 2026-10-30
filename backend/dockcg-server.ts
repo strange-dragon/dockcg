@@ -23,7 +23,9 @@ import { generatePasswordHash } from "./password-hash";
 import { Bean } from "redbean-node/dist/bean";
 import { Arguments, Config, DockcgSocket } from "./util-server";
 import { DockerSocketHandler } from "./agent-socket-handlers/docker-socket-handler";
-import { DockerResourceSocketHandler } from "./agent-socket-handlers/docker-resource-socket-handler";
+import { DockerResourceSocketHandler, dockerLogin } from "./agent-socket-handlers/docker-resource-socket-handler";
+import { Registry } from "./models/registry";
+import { decryptSecret } from "./secret-box";
 import expressStaticGzip from "express-static-gzip";
 import path from "path";
 import { TerminalSocketHandler } from "./agent-socket-handlers/terminal-socket-handler";
@@ -378,6 +380,17 @@ export class DockcgServer {
         }
 
         this.jwtSecret = jwtSecretBean.value;
+
+        // Restore saved Docker logins after a restart. Failures are reported without credentials.
+        Registry.getRegistryList().then(async (registries) => {
+            for (const registry of registries) {
+                try {
+                    await dockerLogin(registry.url, registry.username, decryptSecret(registry.password, this.jwtSecret));
+                } catch {
+                    log.warn("registry", `Could not sync ${registry.url}`);
+                }
+            }
+        }).catch((error) => log.warn("registry", `Could not load registries: ${String(error)}`));
 
         const userCount = (await R.knex("user").count("id as count").first()).count;
 
