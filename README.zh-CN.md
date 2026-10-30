@@ -4,7 +4,7 @@
 
 # Dockcg
 
-一个以 compose 为中心的 Docker 堆栈管理器 —— **基于 [Dockge](https://github.com/louislam/dockge) 的二次开发（fork）**，额外提供「Docker 资源」模块：在 compose 之外启动的容器、镜像、存储卷、网络和仓库凭据。
+一个以 compose 为中心的 Docker 堆栈管理器，fork 自 [Dockge](https://github.com/louislam/dockge)，并扩展出「Docker 资源」模块：在 compose 之外启动的容器、镜像、存储卷、网络和仓库凭据。
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/strange-dragon/dockcg?logo=github&style=flat)](https://github.com/strange-dragon/dockcg) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/strange-dragon/dockcg/master?logo=github)](https://github.com/strange-dragon/dockcg/commits/master/) [![License](https://img.shields.io/github/license/strange-dragon/dockcg)](./LICENSE)
 
@@ -12,9 +12,9 @@
 
 ---
 
-## 亮点
+## Docker 资源
 
-Dockge 有的能力一个没少 —— 堆栈、编辑器、终端、多主机 agent、`docker run` 转 compose。Dockcg 在此基础上新增：
+本 fork 新增，其余 compose 工作流保持不变：
 
 - **容器** —— 只读清点；任意容器都能转成 **Compose 草稿**（镜像、环境变量、端口、挂载、重启策略、网络），原容器不停不删。
 - **镜像** —— 使用中 / 未使用 / 悬空状态，使用该镜像的容器、同 ID 的全部标签、摘要、平台，带实时进度的预拉取，定向删除，清理前先预览。
@@ -29,7 +29,7 @@ Dockge 有的能力一个没少 —— 堆栈、编辑器、终端、多主机 a
 |---|---|
 | ![镜像详情](./docs/screenshots/images.png) | ![存储卷详情](./docs/screenshots/volumes.png) |
 
-其余部分 —— 堆栈管理、编辑器、终端、agent 配置、扫描堆栈目录 —— 与上游完全一致，细节见 [Dockge 的 README](https://github.com/louislam/dockge)。
+其余部分 —— 堆栈管理、编辑器、终端、agent 配置、扫描堆栈目录 —— 都是上游原有行为，见 [Dockge 的 README](https://github.com/louislam/dockge)。
 
 ---
 

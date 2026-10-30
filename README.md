@@ -4,7 +4,7 @@
 
 # Dockcg
 
-A compose-first stack manager for Docker — **a fork of [Dockge](https://github.com/louislam/dockge)** that adds a **Docker resources** section: containers started outside compose, images, volumes, networks and registry credentials.
+A compose-first stack manager for Docker, forked from [Dockge](https://github.com/louislam/dockge) and extended with a **Docker resources** section: containers started outside compose, images, volumes, networks and registry credentials.
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/strange-dragon/dockcg?logo=github&style=flat)](https://github.com/strange-dragon/dockcg) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/strange-dragon/dockcg/master?logo=github)](https://github.com/strange-dragon/dockcg/commits/master/) [![License](https://img.shields.io/github/license/strange-dragon/dockcg)](./LICENSE)
 
@@ -12,9 +12,9 @@ A compose-first stack manager for Docker — **a fork of [Dockge](https://github
 
 ---
 
-## Highlights
+## Docker resources
 
-Everything Dockge does is still here — stacks, editor, terminal, agents, the `docker run` → compose converter. What Dockcg adds:
+New in this fork, on top of an otherwise unchanged compose workflow:
 
 - **Containers** — read-only inventory; any container can be turned into a **Compose draft** (image, env, ports, mounts, restart policy, networks). The original is never stopped or deleted.
 - **Images** — in-use / unused / dangling state, containers using each image, all tags of the same ID, digest, platform, pre-pull with live progress, targeted delete, previewed prune.
@@ -29,7 +29,7 @@ Three rules are enforced in code, not just documented: **no container lifecycle 
 |---|---|
 | ![Image detail](./docs/screenshots/images.png) | ![Volume detail](./docs/screenshots/volumes.png) |
 
-Everything else — stack management, the editor, the terminal, agent setup, stack-folder scanning — works exactly as it does upstream; see [Dockge's README](https://github.com/louislam/dockge) for the details.
+Everything else — stack management, the editor, the terminal, agent setup, stack-folder scanning — is upstream behaviour; see [Dockge's README](https://github.com/louislam/dockge).
 
 ---
 
