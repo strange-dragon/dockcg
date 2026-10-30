@@ -4,7 +4,7 @@
 
 # Dockcg
 
-一个以 compose 为中心的自托管 Docker 堆栈管理器 —— **基于 [Dockge](https://github.com/louislam/dockge) 的二次开发（fork）**。保留上游的 compose 工作流，同时新增「系统资源」模块，用来管理堆栈自己管不到的那部分：镜像、存储卷、网络和私有仓库凭据。
+一个以 compose 为中心的自托管 Docker 堆栈管理器 —— **基于 [Dockge](https://github.com/louislam/dockge) 的二次开发（fork）**。保留上游的 compose 工作流，同时新增「Docker 资源」模块，用来管理堆栈自己管不到的那部分：在 compose 之外启动的容器、镜像、存储卷、网络和私有仓库凭据。
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/strange-dragon/dockcg?logo=github&style=flat)](https://github.com/strange-dragon/dockcg) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/strange-dragon/dockcg/master?logo=github)](https://github.com/strange-dragon/dockcg/commits/master/) [![License](https://img.shields.io/github/license/strange-dragon/dockcg)](./LICENSE)
 
@@ -16,41 +16,37 @@
 
 Dockcg **不是**重写。它就是 Dockge，只是把职责范围往外扩了一圈：Dockge 管 `compose.yaml`，Dockcg 管 `compose.yaml` **以及这些文件依赖的 Docker 资源**。
 
-上游的能力一个都没少 —— 堆栈列表、在线编辑器、网页终端、多主机 agent、`docker run` 转 compose。会用 Dockge 就会用 Dockcg，区别只是侧边栏多了四个标签。
+上游的能力一个都没少 —— 堆栈列表、在线编辑器、网页终端、多主机 agent、`docker run` 转 compose。会用 Dockge 就会用 Dockcg，区别只是侧边栏多了「Docker 资源」入口，其下有容器、镜像、存储卷、网络四个标签。
 
 | | Dockge（上游） | Dockcg（本项目） |
 |---|---|---|
-| 职责范围 | `compose.yaml` 生命周期 | `compose.yaml` **+ 镜像 / 存储卷 / 网络 / 私有仓库** |
-| 导航 | 只有堆栈列表 | 堆栈独立入口；资源区保留容器、镜像、存储卷、网络四个标签，首页直接显示仓库源 |
-| 镜像 | 只能跟随堆栈拉取 | 清点列表，标注 使用中 / 未使用 / 悬空；带进度预拉取；定向删除；清理未使用与悬空镜像 |
-| 存储卷 | 由 compose 隐式持有 | 挂载点、驱动、作用域、归属堆栈与服务、孤儿卷清理、**复制到新卷** |
-| 网络 | 未暴露 | bridge/overlay/host 清点、**可拖拽关联视图**、跨堆栈 `external: true` 片段生成、**合并到共享网络** |
-| 私有仓库 | 未暴露 | Docker Hub / ghcr.io / Harbor 凭据，后台执行 `docker login`，口令加密落库 |
+| 职责范围 | `compose.yaml` 生命周期 | `compose.yaml` **+ 容器 / 镜像 / 存储卷 / 网络 / 私有仓库** |
+| 导航 | 只有堆栈列表 | **堆栈**与 **Docker 资源** 两个入口，资源下四个标签切换左栏列表，点行进入详情页 |
+| 容器 | 只能通过堆栈管理 | 只读清点（状态、镜像、归属堆栈），任何容器都能转成 **Compose 草稿** |
+| 镜像 | 只能跟随堆栈拉取 | 清点列表，标注 使用中 / 未使用 / 悬空；带进度预拉取；定向删除；清理前先预览 |
+| 存储卷 | 由 compose 隐式持有 | 挂载点、驱动、作用域、归属堆栈与服务、孤儿卷清理、按需计算磁盘占用、**复制到新卷** |
+| 网络 | 未暴露 | 清点网络，**关联视图**：把服务拖到网络上，自动改写它的 Compose 文件；合并网络；未纳管服务给 `external: true` 片段 |
+| 私有仓库 | 未暴露 | Docker Hub / ghcr.io / Harbor 凭据，后台执行 `docker login`，口令加密落库；首页还展示 Docker 已有的登录源与镜像加速源 |
 | 语言 | 30 多种 | 仅英文 + 简体中文（默认英文） |
 | 品牌 | `DOCKGE_*` 环境变量、`dockge.db`、`louislam/dockge` 镜像 | `DOCKCG_*`、`dockcg.db`、`strange-dragon/dockcg`，不从上游 Docker Hub 命名空间拉任何东西 |
 | 容器镜像 | 上游 base 镜像 + 健康检查镜像 | 单个自包含 `docker/Dockerfile`（多阶段，不依赖上游基础镜像） |
 
 **该给的署名都给：** 应用本体、UI 语言、compose 编辑器、agent 协议和大部分后端都来自 MIT 协议下的 [louislam/dockge](https://github.com/louislam/dockge)。本项目只加了资源模块并做了重命名；核心功能的问题归上游，好点子也是上游的。
 
-## 三条设计边界
+## 四条设计边界
 
-整个资源模块都受这三条约束，而且约束写在代码里，不只是写在文档里。
+整个资源模块都受这四条约束，而且约束写在代码里，不只是写在文档里。
 
-1. **容器生命周期不出 compose。** 没有 `docker run` 表单，没有裸容器的启动/停止按钮，没有「新建容器」向导。容器的创建、更新、销毁永远由 `docker compose up -d` 完成。
-2. **声明式优先。** 这里建的存储卷和网络，是为了让 `compose.yaml` 能用 `external: true` 接进去。UI 直接把片段给你，而不是把这件事藏起来。
-3. **清理是定向的，绝不 `docker prune`。** 后端先算出候选清单，逐个删除，凡是被容器占用或属于某个 compose 项目的一律拒绝。
+1. **容器生命周期不出 compose。** 没有 `docker run` 表单，没有裸容器的启动/停止按钮，没有「新建容器」向导。容器的创建、更新、销毁永远由 `docker compose up -d` 完成。容器标签只做**读取**：把已有容器转成 Compose 草稿，原容器既不停止也不删除。
+2. **声明式优先。** 存储卷和网络属于 `compose.yaml`。UI 真要改动时（把服务接入网络、合并网络），改的是 Compose 文件，部署仍由你决定；没有 Compose 归属的容器则给你 `external: true` 片段，而不是偷偷跑一次 `docker network connect`。
+3. **先预览，再一次性写入。** 网络变更先以 diff 形式返回；写入时用预览时的文件哈希做校验，你同时在编辑器里改过的文件不会被覆盖。
+4. **清理是定向的，绝不 `docker prune`。** 先给出候选清单，逐个删除，凡是被容器占用、属于某个 compose 项目、或仍在受管理 Compose 文件中声明的一律拒绝。
 
 ## 界面截图
-
-以下截图拍摄于网络关联视图改版之前，展示的是原有页面布局。
 
 | 镜像 | 存储卷 |
 |---|---|
 | ![镜像详情：使用它的容器、层、摘要、平台](./docs/screenshots/images.png) | ![存储卷详情：挂载点、归属堆栈、迁移](./docs/screenshots/volumes.png) |
-
-| 网络 | 堆栈 |
-|---|---|
-| ![旧版网络详情](./docs/screenshots/networks.png) | ![堆栈详情：容器、终端、compose.yaml](./docs/screenshots/stacks.png) |
 
 ## 功能
 
@@ -65,19 +61,21 @@ Dockcg **不是**重写。它就是 Dockge，只是把职责范围往外扩了�
 - 🚄 响应式 —— 进度和日志走 websocket，不轮询
 - 🌐 英文与简体中文，默认英文（`设置 → 外观 → 语言`）
 
-### 系统资源（本项目新增）
+### Docker 资源（本项目新增）
+
+**概览**（`Docker 资源`）—— 一页看完四类资源的数量与前几条记录，每条都能点进详情。清理从这里发起，且一定先弹预览：悬空镜像、未使用镜像、孤儿卷、未使用网络。没确认前不会删任何东西，失败会逐条报出来。
+
+**容器**（`Docker 资源 → 容器`）—— 每个容器的镜像、状态和归属堆栈/服务。「生成 Compose 草稿」会把 `container inspect` 转成 `compose.yaml`（镜像、环境变量、发布端口、挂载、重启策略、网络），附上需要人工核对的提示，然后放进编辑器。原容器不会被停止或删除 —— 你审核草稿、存成堆栈，再由堆栈部署。
 
 **镜像** —— 标签、大小、创建时间；依据 `com.docker.compose.project` 标签解析「使用中 / 未使用 / 悬空」；列出使用该镜像的容器、同一镜像 ID 的所有标签、摘要、平台、入口命令、暴露端口；带实时进度的预拉取；定向删除；清理未使用或悬空镜像。
 
-**存储卷** —— 挂载点、驱动、作用域、标签、归属堆栈与服务、已挂载容器、自动生成的 `compose.yaml` 片段、孤儿卷清理，以及**迁移**：用临时的 `alpine:3` 辅助容器把数据复制到新建空卷，始终保留源卷；核对数据后再修改 `compose.yaml`。只要有容器还在挂载源卷，迁移会被拒绝执行。磁盘占用可按需计算。
+**存储卷** —— 挂载点、驱动、作用域、标签、归属堆栈与服务、已挂载容器、自动生成的 `compose.yaml` 片段、孤儿卷清理、按需计算磁盘占用，以及**复制**：用临时的 `alpine:3` 辅助容器把数据复制到一个**新建空卷**。源卷始终保留；只要有容器还挂着源卷，复制会被拒绝；目标卷若已存在同样拒绝。核对数据后再把 `compose.yaml` 指向新卷。
 
-**网络** —— 驱动、子网、作用域、internal 标记、已接入容器和可拖拽关联视图。拖动受 Dockcg 管理的服务，或选择多个来源网络时，先预览受影响的 Compose 文件。服务端校验并保存文件；到对应堆栈部署后生效。未管理的服务使用生成的 `external: true` 片段。网络清理保护仍在受管理 Compose 文件中声明的名称。
+**网络** —— 驱动、子网、作用域、internal 标记、已接入容器和关联视图。把容器拖到网络上：受管理的服务会预览它的 `compose.yaml` 改动，确认后写入；未纳管的容器给你 `external: true` 片段。合并网络就是把这个改动套到每个来源网络的所有服务上。服务端会校验 YAML、保留文件里的注释，并在文件与预览时不一致时拒绝写入。改完要到对应堆栈部署才生效。网络清理保护受管理 Compose 文件仍在声明的名称。
 
-**私有仓库**（首页展示，`设置 → 私有仓库`管理）—— 显示 Dockcg 可访问的 Docker 配置中的仓库登录源名称，以及守护进程的镜像加速源。配置条目不代表凭据当前仍有效。已保存凭据加密落库，执行 `docker login` 同步，并在服务重启后再次同步；失败时可点击「全部同步」重试。
+**私有仓库**（首页展示，`设置 → 私有仓库`管理）—— 你自己保存的仓库、Docker `config.json` 里能读到的登录源，以及守护进程报告的镜像加速源。配置条目不代表凭据当前仍有效。已保存凭据加密落库，执行 `docker login` 同步，并在服务重启后再次同步；失败时可点「全部同步」重试。
 
-**Agent 管理**（`设置 → Agent`）—— 继续支持添加、改名和移除远程 Dockcg Agent，入口从首页移到设置。
-
-**容器迁移**（`资源 → 容器`）—— 扫描所有容器，根据 inspect 数据生成 Compose 草稿。草稿包括镜像、环境变量、端口、挂载、重启策略和网络，并提示需要人工检查的项目。扫描与生成草稿不会停止或删除原容器；先保存草稿并处理端口冲突，再部署。
+**Agent**（`设置 → Agent`）—— 添加、改名和移除远程 Dockcg Agent；入口从首页移到设置，首页只做仪表盘。
 
 ---
 
@@ -210,7 +208,7 @@ npm run lint
 npm run check-ts
 ```
 
-`.github/workflows/ci.yml` 跑同样的步骤，另外在 Ubuntu runner 上做一次真实端到端验证：部署一个一次性堆栈、启动服务、用 socket.io 登录、跑资源相关的 51 条断言，最后进入构建好的镜像里检查 SQLite 表结构。
+`.github/workflows/ci.yml` 跑同样的步骤，另外在 Ubuntu runner 上做一次真实端到端验证：部署一个一次性堆栈、启动服务、用 socket.io 登录、跑资源相关的 51 条断言，最后进入构建好的镜像里检查 SQLite 表结构。另外两套离线用例用 `npx tsx` 直接跑：`extra/test-compose-network.ts`（改写 Compose 保留注释且可重复执行）和 `extra/test-resource-safety.ts`（清理保护、卷复制、草稿生成）。
 
 ---
 
@@ -221,18 +219,22 @@ frontend（Vue 3 + Vite + TS）
       │  socket.io
 backend（Node 22 + Express + socket.io）
       ├── redbean-node / SQLite  →  /app/data/dockcg.db
-      ├── docker CLI（spawn 直调，不过 shell）→ 镜像 / 卷 / 网络 / 登录
+      ├── docker CLI（spawn 直调，不过 shell）→ 容器 / 镜像 / 卷 / 网络 / 登录
+      ├── compose.yaml 改写（yaml document API + 哈希校验）→ 网络变更
       └── agent socket → 其他 Docker 主机
 ```
 
 资源模块刻意选择直接调 `docker` CLI 而不引入 Docker SDK：这样同一份代码对本地 daemon 和每个 agent 都成立，`docker login` 与 `pull` 也能复用已有的终端流式通道。
 
+网络变更并不是 `docker network connect`。它走 YAML document API 直接改 `compose.yaml`，注释、字段顺序和无关内容都保留；写入是原子的，并用预览时取得的哈希做校验。
+
 ## 已知限制
 
-- 这里不能创建容器 —— 这是设计取舍，不是没做完。
+- 这里不能创建、启动或停止容器 —— 这是设计取舍，不是没做完。容器标签只生成草稿，部署仍是一次正常的堆栈操作。
+- 卷复制只写到**新建**卷，也不会替你改写 `compose.yaml`；目标卷已存在会直接拒绝，不会合并进去。
+- 网络变更只对归属受管理堆栈的容器有效。未纳管的容器要在它自己的 Compose 项目里用片段处理；改完不会自动部署，需要你去部署对应堆栈。
+- 清理不会删除任何仍在受管理 Compose 文件中声明的卷或网络 —— 即使你要求「包含 compose 拥有的资源」也一样。堆栈目录之外的 compose 文件不在检查范围内。
 - 仓库凭据保存在容器的 `~/.docker/config.json`，重建后请挂载 `/root/.docker` 或点一次同步。
-- 存储卷迁移只搬运数据，不会替你改写 `compose.yaml`；页面上的片段告诉你要粘什么。
-- 网络合并是叠加式的（`docker network connect`）。要让它永久生效，仍需按片段修改并 `docker compose up -d`。
 - 不支持 Windows；界面只提供英文与简体中文。
 
 ## 常见问题

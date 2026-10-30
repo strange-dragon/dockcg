@@ -4,7 +4,7 @@
 
 # Dockcg
 
-A compose-first, self-hosted stack manager for Docker — **a fork of [Dockge](https://github.com/louislam/dockge)** that keeps upstream's compose workflow and adds a **System Resources** section for the things a stack does not own by itself: images, volumes, networks and private registry credentials.
+A compose-first, self-hosted stack manager for Docker — **a fork of [Dockge](https://github.com/louislam/dockge)** that keeps upstream's compose workflow and adds a **System Resources** section for the things a stack does not own by itself: containers that were started outside compose, images, volumes, networks and private registry credentials.
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/strange-dragon/dockcg?logo=github&style=flat)](https://github.com/strange-dragon/dockcg) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/strange-dragon/dockcg/master?logo=github)](https://github.com/strange-dragon/dockcg/commits/master/) [![License](https://img.shields.io/github/license/strange-dragon/dockcg)](./LICENSE)
 
@@ -16,16 +16,17 @@ A compose-first, self-hosted stack manager for Docker — **a fork of [Dockge](h
 
 Dockcg is **not** a rewrite. It is Dockge with a different scope of responsibility: Dockge manages `compose.yaml`, Dockcg manages `compose.yaml` **plus the Docker resources those files lean on**.
 
-Everything upstream does still works the same way — the stack list, the interactive editor, the web terminal, agents, the `docker run` → compose converter. If you know Dockge, you already know Dockcg; the sidebar simply grew four tabs.
+Everything upstream does still works the same way — the stack list, the interactive editor, the web terminal, agents, the `docker run` → compose converter. If you know Dockge, you already know Dockcg; the sidebar gained a **Docker resources** entry and four tabs under it: Containers, Images, Volumes and Networks.
 
 | | Dockge (upstream) | Dockcg (this fork) |
 |---|---|---|
-| Scope | `compose.yaml` lifecycle | `compose.yaml` **+ images / volumes / networks / registries** |
-| Navigation | Stack list only | Stacks link plus four Resources tabs: Containers, Images, Volumes and Networks; registry sources appear on Home |
-| Image handling | Pull/update through the stack | Inventory with in-use / unused / dangling state, pre-pull with live progress, targeted delete, prune of unused + dangling |
-| Volumes | Owned silently by compose | Mountpoint, driver, scope, owning stack + service, orphan cleanup, **copy to another volume** |
-| Networks | Not exposed | bridge/overlay/host inventory, **draggable relationship view**, cross-stack `external: true` snippet generator, **merge into a shared network** |
-| Private registries | Not exposed | Docker Hub / ghcr.io / Harbor credentials, `docker login` in the background, password encrypted at rest |
+| Scope | `compose.yaml` lifecycle | `compose.yaml` **+ containers / images / volumes / networks / registries** |
+| Navigation | Stack list only | **Stacks** and **Docker resources** entries, plus four resource tabs that swap the sidebar list; a row opens its detail page |
+| Containers | Only through a stack | Read-only inventory with state, image and owning stack; any container can be turned into a **Compose draft** |
+| Image handling | Pull/update through the stack | Inventory with in-use / unused / dangling state, pre-pull with live progress, targeted delete, previewed prune of unused + dangling images |
+| Volumes | Owned silently by compose | Mountpoint, driver, scope, owning stack + service, orphan cleanup, disk usage on demand, **copy into a new volume** |
+| Networks | Not exposed | bridge/overlay/host inventory, **relationship view**: drag a service onto a network and the Compose file is edited for you; merge networks; `external: true` snippet for unmanaged services |
+| Private registries | Not exposed | Docker Hub / ghcr.io / Harbor credentials, `docker login` in the background, password encrypted at rest, plus the login sources and mirrors Docker already knows about |
 | Language | 30+ locales | English + Simplified Chinese only (English by default) |
 | Branding | `DOCKGE_*` env, `dockge.db`, `louislam/dockge` images | `DOCKCG_*` env, `dockcg.db`, `strange-dragon/dockcg` — nothing is pulled from the upstream Docker Hub namespace |
 | Container | `upstream/base` + `build-healthcheck` images | One self-contained `docker/Dockerfile` (multi-stage, no upstream base image) |
@@ -34,23 +35,18 @@ Everything upstream does still works the same way — the stack list, the intera
 
 ## Design boundaries
 
-Three rules shape the whole resources module. They are enforced in code, not just in the docs.
+Four rules shape the whole resources module. They are enforced in code, not just in the docs.
 
-1. **No container lifecycle outside compose.** There is no `docker run` form, no start/stop button for a bare container, no "create container" wizard. Containers are created, updated and destroyed by `docker compose up -d`, always.
-2. **Declarative first.** Volumes and networks created here exist so that a `compose.yaml` can join them with `external: true`. The UI hands you that snippet instead of hiding the fact.
-3. **Cleanup is targeted, never `docker prune`.** The backend computes the candidate list, removes resources one by one, and refuses anything that is still attached or owned by a compose project.
+1. **No container lifecycle outside compose.** There is no `docker run` form, no start/stop button for a bare container, no "create container" wizard. Containers are created, updated and destroyed by `docker compose up -d`, always. The Containers tab only *reads*: it turns an existing container into a Compose draft, and the original container is never stopped or deleted.
+2. **Declarative first.** Volumes and networks belong in `compose.yaml`. Where the UI does change something — attaching a service to a network, merging networks — it edits the Compose file and leaves deploying to you. Containers that no Compose file owns get the `external: true` snippet instead of a hidden `docker network connect`.
+3. **Edits are previewed, then written once.** Network changes come back as a diff first, and the write is guarded by a hash of the file the preview was made from, so a concurrent edit in the editor is never overwritten.
+4. **Cleanup is targeted, never `docker prune`.** A preview lists the exact candidates, removal runs one item at a time, and anything attached, owned by a compose project or still declared in a managed Compose file is refused.
 
 ## Screenshots
-
-These screenshots predate the network relationship view and show the previous page layout.
 
 | Images | Volumes |
 |---|---|
 | ![Image detail: containers using it, layers, digest, platform](./docs/screenshots/images.png) | ![Volume detail: mountpoint, owning stack, migration](./docs/screenshots/volumes.png) |
-
-| Networks | Stacks |
-|---|---|
-| ![Previous network detail](./docs/screenshots/networks.png) | ![Stack detail: containers, terminal, compose.yaml](./docs/screenshots/stacks.png) |
 
 ## Features
 
@@ -67,17 +63,19 @@ These screenshots predate the network relationship view and show the previous pa
 
 ### System resources (added here)
 
+**Overview** (`Docker resources`) — one page with the count and the first rows of every container, image, volume and network, each linking to its detail view. Cleanup starts here and always opens a preview: dangling images, unused images, orphaned volumes, unused networks. Nothing is removed until you confirm, and failures are reported per item.
+
+**Containers** (`Resources → Containers`) — every container with image, state and owning stack/service. *Generate Compose draft* turns `container inspect` into a `compose.yaml` (image, environment, published ports, mounts, restart policy, networks) with review warnings and opens it in the editor. The source container is never stopped or deleted — you review the draft, save it as a stack, and deploy that.
+
 **Images** — tag, size, created, resolved in-use / unused / dangling state from `com.docker.compose.project` labels, the containers that use the image, all tags sharing the same image ID, digest, platform, entrypoint, exposed ports, pre-pull with live terminal progress, targeted delete, prune of unused or dangling images.
 
-**Volumes** — mountpoint, driver, scope, labels, owning stack + service, attached containers, generated `compose.yaml` snippet, orphan cleanup, and **migration**: the content is copied into a new empty volume by a short-lived `alpine:3` helper. The source is always kept. Update `compose.yaml` after checking the copy. Migration is refused while a container still mounts the source. Disk usage is calculated on demand.
+**Volumes** — mountpoint, driver, scope, labels, owning stack + service, attached containers, generated `compose.yaml` snippet, orphan cleanup, disk usage on demand, and **copy**: the content is copied into a **new empty volume** by a short-lived `alpine:3` helper. The source is always kept, and migration is refused while a container still mounts it. An existing target volume is rejected on purpose. Point `compose.yaml` at the new volume after you check the copy.
 
-**Networks** — driver, subnet, scope, internal flag, attached containers and a draggable relationship view. Dragging a managed service or selecting several source networks previews changes to the affected Compose files. The server validates and saves the files; deploy the stacks to apply the changes. Unmanaged services use the generated `external: true` snippet. Unused network cleanup protects names declared in managed Compose files.
+**Networks** — driver, subnet, scope, internal flag, attached containers and a relationship view. Drag a container onto the network: a managed service previews the change to its `compose.yaml` and saves it on confirmation, an unmanaged container gets the `external: true` snippet. Merging networks runs the same edit across every source network's stacks. The server validates the YAML, keeps the file's comments, and refuses to write if the file changed since the preview. Deploy the stack to apply. Network cleanup protects names that managed Compose files still declare.
 
-**Registries** (`Home`, with management in `Settings → Registries`) — shows login source names from the Docker config visible to Dockcg and mirrors from the daemon. Source entries do not prove credentials are still valid. Saved credentials are encrypted at rest, synced with `docker login` and restored after server restart; failures can be retried with *Sync all*.
+**Registries** (`Home`, with management in `Settings → Registries`) — the registries you saved, the login sources found in Docker's `config.json` and the mirrors the daemon reports. Source entries do not prove credentials are still valid. Saved credentials are encrypted at rest, synced with `docker login` and restored after server restart; failures can be retried with *Sync all*.
 
-**Agent management** (`Settings → Agents`) — add, rename and remove remote Dockcg agents; this was moved from the Home page to keep Home focused.
-
-**Container migration** (`Resources → Containers`) — scans every container and generates a Compose draft from its inspect data. The draft includes image, environment, published ports, mounts, restart policy and networks, plus review warnings. The original container is never stopped or deleted. Save the draft first and resolve port conflicts before deploying.
+**Agents** (`Settings → Agents`) — add, rename and remove remote Dockcg agents; the entry moved off the Home page so Home stays a dashboard.
 
 ---
 
@@ -210,7 +208,7 @@ npm run lint
 npm run check-ts
 ```
 
-`.github/workflows/ci.yml` runs the same steps plus a real end-to-end pass on an Ubuntu runner: it deploys a throwaway stack, starts the server, logs in over socket.io, exercises the resources API (51 assertions) and finally inspects the SQLite schema inside the built image.
+`.github/workflows/ci.yml` runs the same steps plus a real end-to-end pass on an Ubuntu runner: it deploys a throwaway stack, starts the server, logs in over socket.io, exercises the resources API (51 assertions) and finally inspects the SQLite schema inside the built image. Two more suites run offline with `npx tsx`: `extra/test-compose-network.ts` (Compose rewriting keeps comments and is idempotent) and `extra/test-resource-safety.ts` (prune guards, volume migration and draft generation).
 
 ---
 
@@ -221,18 +219,22 @@ frontend (Vue 3 + Vite + TS)
       │  socket.io
 backend (Node 22 + Express + socket.io)
       ├── redbean-node / SQLite  →  /app/data/dockcg.db
-      ├── docker CLI (spawn, no shell) → images / volumes / networks / login
+      ├── docker CLI (spawn, no shell) → containers / images / volumes / networks / login
+      ├── compose.yaml rewriting (yaml document API, hash-guarded) → network changes
       └── agent sockets → other Docker hosts
 ```
 
 The resources module deliberately shells out to the `docker` CLI instead of embedding a Docker SDK: the same code path then works for the local daemon and for every agent, and `docker login`/`pull` keep streaming through the existing terminal plumbing.
 
+Network changes are not `docker network connect`. They are edits to `compose.yaml` made through a YAML document API, so comments, ordering and unrelated fields survive; the write is atomic and guarded by a hash taken at preview time.
+
 ## Known limitations
 
-- Containers cannot be created here — that is a design decision, not a missing feature.
+- Containers cannot be created, started or stopped here — that is a design decision, not a missing feature. The Containers tab produces a draft, and deploying it is a normal stack action.
+- A volume copy only writes into a **new** volume and never rewrites `compose.yaml` for you; an existing target is refused rather than merged into.
+- Network changes only work for containers that belong to a managed stack. Unmanaged containers need the snippet in their own Compose project, and no change is deployed automatically — you deploy the stack afterwards.
+- Prune refuses any volume or network whose name is still declared in a managed Compose file, even when you ask it to include compose-owned resources. Compose files outside the stacks directory are invisible to that check.
 - Registries store credentials in the container's `~/.docker/config.json`; mount `/root/.docker` or re-sync after a recreate.
-- A volume migration copies bytes, it does not rewrite `compose.yaml` for you; the snippet on the page tells you what to paste.
-- A network merge is additive (`docker network connect`). Making it permanent still requires the snippet plus `docker compose up -d`.
 - Windows is not supported, and only English plus Simplified Chinese ship with the UI.
 
 ## FAQ
