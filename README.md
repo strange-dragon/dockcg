@@ -12,9 +12,9 @@ A compose-first stack manager for Docker — **a fork of [Dockge](https://github
 
 ---
 
-## What you get on top of Dockge
+## Highlights
 
-Stacks, the editor, the terminal, agents, the `docker run` → compose converter: all upstream, unchanged. Only the sidebar grew.
+Everything Dockge does is still here — stacks, editor, terminal, agents, the `docker run` → compose converter. What Dockcg adds:
 
 - **Containers** — read-only inventory; any container can be turned into a **Compose draft** (image, env, ports, mounts, restart policy, networks). The original is never stopped or deleted.
 - **Images** — in-use / unused / dangling state, containers using each image, all tags of the same ID, digest, platform, pre-pull with live progress, targeted delete, previewed prune.
@@ -29,7 +29,7 @@ Three rules are enforced in code, not just documented: **no container lifecycle 
 |---|---|
 | ![Image detail](./docs/screenshots/images.png) | ![Volume detail](./docs/screenshots/volumes.png) |
 
-Everything else — how stacks work, the editor, the terminal, agent setup, stack-folder scanning — behaves exactly like Dockge. Read [upstream's README](https://github.com/louislam/dockge) for that; if you know Dockge, you already know this.
+Everything else — stack management, the editor, the terminal, agent setup, stack-folder scanning — works exactly as it does upstream; see [Dockge's README](https://github.com/louislam/dockge) for the details.
 
 ---
 

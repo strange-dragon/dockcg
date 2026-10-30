@@ -12,9 +12,9 @@
 
 ---
 
-## 相对 Dockge 多了什么
+## 亮点
 
-堆栈、编辑器、终端、多主机 agent、`docker run` 转 compose —— 全部沿用上游，没有改动。多的只是侧边栏。
+Dockge 有的能力一个没少 —— 堆栈、编辑器、终端、多主机 agent、`docker run` 转 compose。Dockcg 在此基础上新增：
 
 - **容器** —— 只读清点；任意容器都能转成 **Compose 草稿**（镜像、环境变量、端口、挂载、重启策略、网络），原容器不停不删。
 - **镜像** —— 使用中 / 未使用 / 悬空状态，使用该镜像的容器、同 ID 的全部标签、摘要、平台，带实时进度的预拉取，定向删除，清理前先预览。
@@ -29,7 +29,7 @@
 |---|---|
 | ![镜像详情](./docs/screenshots/images.png) | ![存储卷详情](./docs/screenshots/volumes.png) |
 
-其余部分 —— 堆栈怎么用、编辑器、终端、agent 配置、扫描堆栈目录 —— 与 Dockge 完全一致，用法见[上游 README](https://github.com/louislam/dockge)；会用 Dockge 就会用这个。
+其余部分 —— 堆栈管理、编辑器、终端、agent 配置、扫描堆栈目录 —— 与上游完全一致，细节见 [Dockge 的 README](https://github.com/louislam/dockge)。
 
 ---
 
