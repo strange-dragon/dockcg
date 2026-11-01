@@ -7,32 +7,48 @@
         </select>
 
         <div class="shadow-box panel">
-            <!-- Creating a stack is the only write action, so it keeps the space.
-                 Search is a small icon and only expands when it is used. -->
-            <div class="panel-head">
-                <template v-if="!searchOpen">
-                    <router-link v-if="view === 'stacks'" to="/compose" class="add-btn" :title="$t('addStack')">
-                        <font-awesome-icon icon="plus" />
-                        <span>{{ $t("addStack") }}</span>
-                    </router-link>
-                    <div v-else class="head-spacer"></div>
+            <!-- Creating a stack is the only write action, so it is a real
+                 Dockge button and takes most of the row. Search fills what is
+                 left; when the column gets too narrow for an input it falls
+                 back to an icon that opens the input and hides it on blur. -->
+            <div ref="head" class="panel-head" :class="{ compact, searching: compact && searchOpen }">
+                <router-link to="/compose" class="btn btn-primary add-btn" :title="$t('addStack')">
+                    <font-awesome-icon icon="plus" />
+                    <span class="add-label">{{ $t("compose") }}</span>
+                </router-link>
 
-                    <button class="icon-btn" type="button" :title="$t('search')" @click="openSearch">
-                        <font-awesome-icon icon="search" />
-                    </button>
-                </template>
+                <button v-if="compact && !searchOpen" class="icon-btn" type="button" :title="$t('search')" @click="openSearch">
+                    <font-awesome-icon icon="search" />
+                </button>
 
                 <div v-else class="search">
                     <font-awesome-icon icon="search" class="search-icon" />
                     <input
-                        ref="searchInput" v-model="search" class="search-input" type="search"
-                        :placeholder="searchPlaceholder" autocomplete="off"
-                        @keydown.esc="closeSearch"
+                        ref="searchInput" v-model="search" class="form-control search-input" type="search"
+                        :placeholder="compact ? $t('search') : searchPlaceholder" autocomplete="off"
+                        @blur="onSearchBlur" @keydown.esc="closeSearch"
                     />
-                    <button class="search-clear" type="button" :title="$t('cancel')" @click="closeSearch">
+                    <button class="search-clear" type="button" :title="$t('cancel')" @mousedown.prevent="closeSearch">
                         <font-awesome-icon icon="times" />
                     </button>
                 </div>
+            </div>
+
+            <!-- Outer tabs sit right under the head: stacks first, and picking
+                 another one collapses the stack list in place. -->
+            <div class="panel-tabs">
+                <div class="seg">
+                    <button
+                        v-for="tab in tabs" :key="tab.key" class="seg-item"
+                        :class="{ active: view === tab.key }" type="button"
+                        @click="setView(tab.key)"
+                    >
+                        {{ $t(tab.label) }}
+                    </button>
+                </div>
+                <button class="foot-refresh" type="button" :disabled="loading" :title="$t('refresh')" @click="refresh">
+                    <font-awesome-icon icon="arrows-rotate" :spin="loading" />
+                </button>
             </div>
 
             <div class="panel-body">
@@ -106,23 +122,6 @@
                     <div v-else-if="rows.length === 0" class="empty">{{ $t("noResources") }}</div>
                 </template>
             </div>
-
-            <!-- Dockge's list stays the main content; the resource lists sit at
-                 the bottom and simply replace it, one tab highlighted at a time. -->
-            <div class="panel-foot">
-                <div class="seg">
-                    <button
-                        v-for="tab in tabs" :key="tab.key" class="seg-item"
-                        :class="{ active: view === tab.key }" type="button"
-                        @click="setView(tab.key)"
-                    >
-                        {{ $t(tab.label) }}
-                    </button>
-                </div>
-                <button class="foot-refresh" type="button" :disabled="loading" :title="$t('refresh')" @click="refresh">
-                    <font-awesome-icon icon="arrows-rotate" :spin="loading" />
-                </button>
-            </div>
         </div>
     </aside>
 </template>
@@ -182,6 +181,9 @@ export default {
             view: "stacks",
             search: "",
             searchOpen: false,
+            /** Column too narrow for an input: search collapses to an icon */
+            compact: false,
+            headObserver: null,
             loading: false,
             loadError: "",
             requestId: 0,
@@ -359,10 +361,16 @@ export default {
     mounted() {
         this.expandCurrentStack();
         this.refresh();
+        this.observeHead();
+    },
+
+    beforeUnmount() {
+        this.headObserver?.disconnect();
+        this.headObserver = null;
     },
 
     methods: {
-        /** Collapse the stack list and show one resource list in its place. */
+        /** Collapse the list and show one resource list in its place. */
         setView(view) {
             if (this.view === view) {
                 return;
@@ -371,6 +379,28 @@ export default {
             this.search = "";
             this.searchOpen = false;
             this.refresh();
+        },
+
+        /**
+         * Watch the header width: below the threshold the search input cannot
+         * show a usable amount of text next to the Compose button, so it turns
+         * into an icon that opens the input on demand.
+         */
+        observeHead() {
+            if (typeof ResizeObserver === "undefined") {
+                return;
+            }
+            this.headObserver = new ResizeObserver((entries) => {
+                const width = entries[0]?.contentRect?.width ?? 0;
+                const compact = width > 0 && width < 240;
+                if (compact !== this.compact) {
+                    this.compact = compact;
+                    if (compact) {
+                        this.searchOpen = false;
+                    }
+                }
+            });
+            this.headObserver.observe(this.$refs.head);
         },
 
         openSearch() {
@@ -383,6 +413,13 @@ export default {
         closeSearch() {
             this.search = "";
             this.searchOpen = false;
+        },
+
+        /** Icon mode hides the input again as soon as it loses focus */
+        onSearchBlur() {
+            if (this.compact) {
+                this.closeSearch();
+            }
         },
 
         stackKey(stack) {
@@ -520,65 +557,58 @@ export default {
     }
 }
 
+/* Header row: Dockge's `.btn` for Compose (takes most of the row) and the
+   search input filling what is left, both at the same height. */
 .panel-head {
-    display: flex;
-    align-items: center;
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(92px, 2fr);
+    align-items: stretch;
     gap: var(--rd-2);
     padding: var(--rd-2);
     border-bottom: 1px solid var(--card-border);
+
+    /* No room for an input next to the button: collapse to an icon */
+    &.compact {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    /* Opened from the icon, the input borrows the whole row */
+    &.searching .search {
+        position: absolute;
+        left: var(--rd-2);
+        right: var(--rd-2);
+        top: var(--rd-2);
+        bottom: var(--rd-2);
+        z-index: 2;
+    }
 }
 
-/* The one write action, so it reads as the primary button of the panel */
+/* Real Bootstrap button, so it is exactly Dockge's size and colour */
 .add-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    flex: 1 1 auto;
     min-width: 0;
-    height: 34px;
-    padding: 0 12px;
-    border-radius: var(--rd-radius-sm);
-    background: $primary-gradient;
-    color: #08202e;
-    font-size: var(--rd-fs-small);
-    font-weight: 600;
-    text-decoration: none;
     white-space: nowrap;
     overflow: hidden;
-    transition: filter 0.1s ease-in-out;
-
-    .dark & {
-        color: $dark-font-color2;
-    }
-
-    &:hover {
-        filter: brightness(1.06);
-        color: #08202e;
-
-        .dark & {
-            color: $dark-font-color2;
-        }
-    }
 
     svg {
-        font-size: 12px;
         flex: 0 0 auto;
     }
-
-    span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
 }
 
-.head-spacer {
-    flex: 1 1 auto;
+.add-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Search is a 30px icon; it only shows the input once it is used */
+/* Search is a 30px icon in compact mode; clicking it shows the input */
 .icon-btn {
-    flex: 0 0 auto;
+    align-self: center;
+    justify-self: end;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -608,29 +638,26 @@ export default {
     position: relative;
     display: flex;
     align-items: center;
-    flex: 1 1 auto;
     min-width: 0;
 }
 
 .search-icon {
     position: absolute;
-    left: 9px;
+    left: 11px;
     color: var(--dim);
     font-size: 12px;
     pointer-events: none;
 }
 
+/* Bootstrap `.form-control` for the same height as the button */
 .search-input {
+    flex: 1 1 auto;
     width: 100%;
-    height: 30px;
-    padding: 0 26px;
-    border: 1px solid var(--card-border);
-    border-radius: var(--rd-radius-sm);
-    background: var(--panel-bg);
-    color: inherit;
+    min-width: 0;
+    height: 100%;
+    padding: 0 26px 0 32px;
     font-size: var(--rd-fs-small);
-    line-height: 30px;
-    outline: none;
+    line-height: 1;
 
     &::placeholder {
         color: var(--dim);
@@ -639,20 +666,11 @@ export default {
     &::-webkit-search-cancel-button {
         display: none;
     }
-
-    &:focus {
-        border-color: $primary;
-        background: transparent;
-    }
-
-    .dark & {
-        background: $dark-bg2;
-    }
 }
 
 .search-clear {
     position: absolute;
-    right: 4px;
+    right: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -845,16 +863,17 @@ export default {
     font-variant-numeric: tabular-nums;
 }
 
-/* IMAGES / VOLUMES / NETWORKS: badge + name, still one line */
+/* IMAGES / VOLUMES / NETWORKS: same row geometry as a stack, so switching
+   tabs does not change the density of the list */
 .res-row {
     display: flex;
     align-items: center;
     gap: 8px;
     width: 100%;
-    min-height: 36px;
-    padding: 4px 8px;
+    min-height: 52px;
+    padding: 5px 8px;
     border: 0;
-    border-radius: var(--rd-radius-sm);
+    border-radius: var(--rd-radius);
     background: transparent;
     color: inherit;
     text-align: left;
@@ -905,13 +924,13 @@ export default {
     }
 }
 
-/* Footer: Dockge's list is the default tab, the resource lists sit next to it */
-.panel-foot {
+/* Outer tabs, directly under the head: stacks is the default list */
+.panel-tabs {
     display: flex;
     align-items: center;
     gap: var(--rd-2);
     padding: var(--rd-2);
-    border-top: 1px solid var(--card-border);
+    border-bottom: 1px solid var(--card-border);
 }
 
 .seg {
@@ -931,12 +950,12 @@ export default {
 .seg-item {
     flex: 1 1 0;
     min-width: 0;
-    padding: 5px 2px;
+    padding: 6px 2px;
     border: 0;
     border-radius: 6px;
     background: transparent;
     color: #5c6773;
-    font-size: 13px;
+    font-size: var(--rd-fs-small);
     line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
