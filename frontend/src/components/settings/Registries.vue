@@ -25,21 +25,21 @@
             </div>
         </div>
 
-        <p class="registries-hint">{{ $t("registriesHint") }}</p>
+        <p class="registries-hint small">{{ $t("registriesHint") }}</p>
 
         <section class="shadow-box configured-sources mb-4">
-            <h2>{{ $t("configuredDockerSources") }}</h2>
-            <p class="registries-hint">{{ $t("configuredDockerSourcesHint") }}</p>
-            <p class="registries-hint">{{ $t("configuredSourceUnverified") }}</p>
+            <h2 class="h5">{{ $t("configuredDockerSources") }}</h2>
+            <p class="registries-hint small">{{ $t("configuredDockerSourcesHint") }}</p>
+            <p class="registries-hint small">{{ $t("configuredSourceUnverified") }}</p>
             <div v-if="loading" class="text-muted" role="status">{{ $t("loadingResources") }}</div>
             <div v-else-if="loadError" class="text-danger">{{ loadError }}</div>
             <template v-else>
-                <div class="source-group">
+                <div class="source-group small">
                     <strong>{{ $t("dockerLoginSources") }}</strong>
                     <span v-if="sources.loginRegistries.length === 0" class="text-muted">{{ $t("noDockerLoginSources") }}</span>
                     <code v-for="name in sources.loginRegistries" :key="name" class="source-chip">{{ name }}</code>
                 </div>
-                <div class="source-group">
+                <div class="source-group small">
                     <strong>{{ $t("dockerRegistryMirrors") }}</strong>
                     <span v-if="sources.mirrors.length === 0" class="text-muted">{{ $t("noDockerRegistryMirrors") }}</span>
                     <code v-for="mirror in sources.mirrors" :key="mirror" class="source-chip">{{ mirror }}</code>
@@ -91,7 +91,7 @@
 
         <!-- List -->
         <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle resources-table">
+            <table class="table table-sm table-hover align-middle resources-table small">
                 <thead>
                     <tr>
                         <th>{{ $t("registry") }}</th>
@@ -326,14 +326,13 @@ export default {
 @import "../../styles/vars.scss";
 
 .registries-hint {
-    font-size: 14px;
     opacity: 0.7;
 }
 
 .registry-endpoint { width: auto; min-width: 180px; }
 .configured-sources { padding: 16px 18px; }
-.configured-sources h2 { font-size: 17px; margin-bottom: 4px; }
-.source-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; }
+.configured-sources h2 { margin-bottom: 4px; }
+.source-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .source-group strong { min-width: 145px; }
 .source-chip { padding: 5px 9px; border-radius: 7px; background: #f1f3f5; overflow-wrap: anywhere; }
 .dark .source-chip { background: $dark-bg2; }
@@ -343,8 +342,6 @@ export default {
 }
 
 .resources-table {
-    font-size: 14px;
-
     th {
         font-weight: 600;
         white-space: nowrap;
