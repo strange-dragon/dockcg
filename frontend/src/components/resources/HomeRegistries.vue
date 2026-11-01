@@ -50,7 +50,9 @@ export default {
             sources: { loginRegistries: [],
                 mirrors: [],
                 configError: "",
-                daemonError: "" },
+                daemonError: "",
+                configPath: "",
+                credsStore: "" },
             loading: false,
             error: "",
             requestId: 0,
@@ -84,7 +86,9 @@ export default {
                     this.sources = res.sources || { loginRegistries: [],
                         mirrors: [],
                         configError: "",
-                        daemonError: "" };
+                        daemonError: "",
+                        configPath: "",
+                        credsStore: "" };
                 } else {
                     this.error = res?.msg || this.$t("unknownError");
                 }

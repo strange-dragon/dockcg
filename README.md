@@ -101,6 +101,28 @@ services:
 
 Reverse proxy setups (Caddy / nginx / Traefik, websocket included) are in [docs/reverse-proxy.md](./docs/reverse-proxy.md).
 
+### Private registries and registry mirrors
+
+The "Docker sources currently configured" block under `Settings → Registries` is read-only and has exactly two origins:
+
+- **Registry logins** — registries added in Dockcg (credentials are encrypted in `data/dockcg.db` and replayed with `docker login` on every start), plus `auths` / `credHelpers` from the container's own `~/.docker/config.json`.
+- **Registry mirrors** — the Docker daemon's `registry-mirrors`, read with `docker info`. Dockcg cannot change them.
+
+Credentials from a `docker login` on the **host** live in the host's `/root/.docker/config.json` and are invisible inside the container. Mount it to reuse them:
+
+```yaml
+volumes:
+  - /root/.docker/:/root/.docker
+```
+
+Mirrors work the same way — edit the host's `/etc/docker/daemon.json`:
+
+```json
+{ "registry-mirrors": ["https://docker.m.daocloud.io"] }
+```
+
+then `systemctl restart docker` and refresh the page. With no mirror configured the list stays empty and pulls go straight to Docker Hub.
+
 ### Upgrade and backup
 
 ```bash

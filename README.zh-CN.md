@@ -101,6 +101,28 @@ services:
 
 反向代理（Caddy / nginx / Traefik，含 websocket）见 [docs/reverse-proxy.md](./docs/reverse-proxy.md)。
 
+### 私有仓库与镜像加速源
+
+`设置 → 仓库` 里那块「当前 Docker 源」是只读展示，只有两个来源：
+
+- **仓库登录源** —— Dockcg 里添加的仓库（凭据加密存在 `data/dockcg.db`，每次启动自动重新 `docker login`），加上容器内 `~/.docker/config.json` 的 `auths` / `credHelpers`。
+- **镜像加速源** —— Docker 守护进程的 `registry-mirrors`，由 Dockcg 执行 `docker info` 读出来，容器里改不了。
+
+在**宿主机上** `docker login` 的凭据写在宿主机的 `/root/.docker/config.json`，容器里看不见。想让 Dockcg 用上，把它挂进来：
+
+```yaml
+volumes:
+  - /root/.docker/:/root/.docker
+```
+
+加速源也一样，改宿主机的 `/etc/docker/daemon.json`：
+
+```json
+{ "registry-mirrors": ["https://docker.m.daocloud.io"] }
+```
+
+改完 `systemctl restart docker` 再刷新页面。没配加速源时列表就是空的 —— 拉取直接走 Docker Hub。
+
 ### 升级与备份
 
 ```bash

@@ -6,7 +6,7 @@ import { R } from "redbean-node";
 import { Registry } from "../models/registry";
 import { decryptSecret, encryptSecret } from "../secret-box";
 import { dockerExec } from "../docker-cli";
-import { getDockerRegistrySources } from "../docker-registry-sources";
+import { displayRegistryName, getDockerRegistrySources } from "../docker-registry-sources";
 import { addServiceNetwork, saveServiceNetwork } from "../compose-network-association";
 import { Stack } from "../stack";
 import { realpath } from "node:fs/promises";
@@ -457,6 +457,20 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 checkLogin(socket);
                 const list = await Registry.getRegistryList();
                 const sources = await getDockerRegistrySources();
+
+                // A registry saved here is logged in by Dockcg itself (and
+                // replayed on every start), so it counts as a login even when
+                // config.json is not visible from inside the container.
+                const known = new Set(sources.loginRegistries);
+                for (const registry of list) {
+                    const label = displayRegistryName(registry.url);
+                    if (label && !known.has(label)) {
+                        known.add(label);
+                        sources.loginRegistries.push(label);
+                    }
+                }
+                sources.loginRegistries.sort();
+
                 callbackResult({
                     ok: true,
                     registries: list.map((registry) => registry.toJSON()),

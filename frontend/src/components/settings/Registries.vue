@@ -44,6 +44,12 @@
                     <span v-if="sources.mirrors.length === 0 && !sources.daemonError" class="text-muted">{{ $t("noDockerRegistryMirrors") }}</span>
                     <code v-for="mirror in sources.mirrors" :key="mirror" class="source-chip">{{ mirror }}</code>
                 </div>
+                <p class="registries-hint small source-path mb-0">
+                    {{ $t("registrySourcePath") }} <code>{{ sources.configPath }}</code>
+                </p>
+                <p v-if="sources.credsStore" class="registries-hint small mb-0">
+                    {{ $t("credentialsManagedBy") }} <code>{{ sources.credsStore }}</code>
+                </p>
                 <p v-if="sources.configError" class="text-warning small mb-0">{{ $t("dockerConfigReadFailed") }}</p>
                 <p v-if="sources.daemonError" class="text-warning small mb-0">{{ $t("dockerMirrorReadFailed") }}</p>
             </template>
@@ -159,7 +165,9 @@ export default {
             sources: { loginRegistries: [],
                 mirrors: [],
                 configError: "",
-                daemonError: "" },
+                daemonError: "",
+                configPath: "",
+                credsStore: "" },
             selectedEndpoint: this.$route.query.endpoint || this.endpoint,
             loadError: "",
             requestId: 0,
@@ -214,7 +222,9 @@ export default {
                     this.sources = res.sources || { loginRegistries: [],
                         mirrors: [],
                         configError: "",
-                        daemonError: "" };
+                        daemonError: "",
+                        configPath: "",
+                        credsStore: "" };
                 } else {
                     this.registries = [];
                     this.sources = { loginRegistries: [],
@@ -336,6 +346,11 @@ export default {
 .source-group strong { min-width: 145px; }
 .source-chip { padding: 5px 9px; border-radius: 7px; background: #f1f3f5; overflow-wrap: anywhere; }
 .dark .source-chip { background: $dark-bg2; }
+
+/* Where the list was read from, so an empty list is diagnosable */
+.source-path { margin-top: 12px; }
+.source-path code { padding: 2px 6px; border-radius: 5px; background: #f1f3f5; overflow-wrap: anywhere; }
+.dark .source-path code { background: $dark-bg2; }
 
 .add-form {
     padding: 18px 20px;

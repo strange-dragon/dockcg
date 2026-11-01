@@ -9,6 +9,10 @@ export interface DockerRegistrySources {
     mirrors : string[];
     configError : string;
     daemonError : string;
+    /** Where the login list was read from, so the UI can say it out loud. */
+    configPath : string;
+    /** Set when an external credential helper owns the secrets. */
+    credsStore : string;
 }
 
 function publicEndpoint(value : string) : string {
@@ -22,6 +26,26 @@ function publicEndpoint(value : string) : string {
     } catch (e) {
         return value.includes("@") ? value.substring(value.lastIndexOf("@") + 1) : value;
     }
+}
+
+/** Comparison key: no scheme, no trailing slash, lower case. */
+export function registryKey(value : string) : string {
+    return publicEndpoint(value)
+        .replace(/^[a-z]+:\/\//i, "")
+        .replace(/\/+$/, "")
+        .toLowerCase();
+}
+
+/**
+ * Short label for the UI. Docker Hub answers on several host names and
+ * everyone calls it docker.io, so they collapse into one entry.
+ */
+export function displayRegistryName(value : string) : string {
+    const key = registryKey(value);
+    if ([ "docker.io", "index.docker.io", "index.docker.io/v1", "registry-1.docker.io" ].includes(key)) {
+        return "docker.io";
+    }
+    return key;
 }
 
 /* Every docker CLI version stores the mirrors under a slightly different key,
@@ -129,21 +153,30 @@ async function readDaemonMirrors() : Promise<{ mirrors : string[]; error : strin
 
 /** Read registry names only. Docker auth and credential-helper values stay on the server. */
 export async function getDockerRegistrySources() : Promise<DockerRegistrySources> {
-    const loginRegistries = new Set<string>();
+    const loginRegistries = new Map<string, string>();
     const configDir = process.env.DOCKER_CONFIG || join(homedir(), ".docker");
+    const configPath = join(configDir, "config.json");
     let configError = "";
+    let credsStore = "";
 
     try {
-        const config = JSON.parse(await readFile(join(configDir, "config.json"), "utf8")) as {
+        const config = JSON.parse(await readFile(configPath, "utf8")) as {
             auths? : Record<string, unknown>;
             credHelpers? : Record<string, unknown>;
+            credsStore? : unknown;
         };
 
         for (const name of Object.keys(config.auths || {})) {
-            loginRegistries.add(publicEndpoint(name));
+            loginRegistries.set(registryKey(name), displayRegistryName(name));
         }
         for (const name of Object.keys(config.credHelpers || {})) {
-            loginRegistries.add(publicEndpoint(name));
+            loginRegistries.set(registryKey(name), displayRegistryName(name));
+        }
+
+        if (typeof config.credsStore === "string") {
+            // The secrets live in an external helper, so config.json carries no
+            // per-registry keys at all. Say so instead of showing an empty list.
+            credsStore = config.credsStore;
         }
     } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -155,9 +188,11 @@ export async function getDockerRegistrySources() : Promise<DockerRegistrySources
     const { mirrors, error: daemonError } = await readDaemonMirrors();
 
     return {
-        loginRegistries: Array.from(loginRegistries).sort(),
+        loginRegistries: Array.from(loginRegistries.values()).sort(),
         mirrors,
         configError,
         daemonError,
+        configPath,
+        credsStore,
     };
 }

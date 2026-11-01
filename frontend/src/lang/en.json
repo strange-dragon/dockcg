@@ -350,9 +350,9 @@
     "configuredDockerSources": "Docker sources currently configured",
     "configuredDockerSourcesHint": "Registry login names come from Docker config visible to Dockcg (mount the host config to show host logins); mirrors come from the Docker daemon. Credentials are never shown.",
     "dockerLoginSources": "Registry logins",
-    "noDockerLoginSources": "No registry login found in Docker config.",
+    "noDockerLoginSources": "No login found — Dockcg reads the Docker config inside its own container. Mount the host's /root/.docker to see logins made on the host, or add the registry on this page.",
     "dockerRegistryMirrors": "Registry mirrors",
-    "noDockerRegistryMirrors": "No registry mirror configured.",
+    "noDockerRegistryMirrors": "The daemon has no registry mirror; pulls go straight to Docker Hub (docker.io).",
     "dockerMirrorReadFailed": "Could not read daemon mirrors.",
     "dockerConfigReadFailed": "Could not read Docker config.",
     "networkAutoComposeHint": "Drag a managed Compose service here to preview its network declaration. Save and deploy the stack to apply it.",
@@ -414,5 +414,7 @@
     "migrationRestart": "Restart policy",
     "environment": "Environment",
     "image": "Image",
-    "ports": "Ports"
+    "ports": "Ports",
+    "registrySourcePath": "Read from",
+    "credentialsManagedBy": "Credentials are owned by an external helper, so the registry list is not in the config file:"
 }

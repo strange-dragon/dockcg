@@ -20,7 +20,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
 
-      # If you want to use private registries, you need to share the auth file with Dockcg:
+      # Registry logins made on the HOST live in /root/.docker/config.json, which
+      # is invisible from inside the container. Mount it to reuse those logins
+      # (and to keep the ones Dockcg creates after the container is recreated):
       # - /root/.docker/:/root/.docker
 
       # Stacks Directory

@@ -350,9 +350,9 @@
     "configuredDockerSources": "当前 Docker 源",
     "configuredDockerSourcesHint": "仓库登录源名称来自 Dockcg 可访问的 Docker 配置（要显示宿主机登录源，需挂载宿主机配置）；镜像加速源来自 Docker 守护进程。不会显示凭据。",
     "dockerLoginSources": "仓库登录源",
-    "noDockerLoginSources": "Docker 配置中没有仓库登录源。",
+    "noDockerLoginSources": "没有找到登录凭据 —— Dockcg 读的是容器内的 Docker 配置，宿主机上 docker login 的凭据需要把 /root/.docker 挂载进来，或者在本页添加仓库。",
     "dockerRegistryMirrors": "镜像加速源",
-    "noDockerRegistryMirrors": "未配置镜像加速源。",
+    "noDockerRegistryMirrors": "守护进程没有配置加速源，拉取镜像直接走 Docker Hub（docker.io）。",
     "dockerMirrorReadFailed": "无法读取守护进程的镜像加速源。",
     "dockerConfigReadFailed": "无法读取 Docker 配置。",
     "networkAutoComposeHint": "将 Dockcg 管理的 Compose 服务拖到这里，预览网络声明。保存并部署堆栈后生效。",
@@ -414,5 +414,7 @@
     "migrationRestart": "重启策略",
     "environment": "环境变量",
     "image": "镜像",
-    "ports": "端口"
+    "ports": "端口",
+    "registrySourcePath": "读取自",
+    "credentialsManagedBy": "凭据由外部 helper 管理，仓库列表不在配置文件里："
 }
