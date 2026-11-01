@@ -334,14 +334,23 @@ export default {
     .dark &:hover, .dark &.active { background: $dark-header-bg; color: $primary; }
 }
 
+/* Single-row segmented control, as in docs/screenshots: a quiet track with one
+ * filled pill for the active tab. Never wraps to a second row — narrow
+ * sidebars scroll horizontally instead. */
 .seg {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--rd-1);
-    padding: var(--rd-1);
+    display: flex;
+    gap: 2px;
+    padding: 3px;
     margin-bottom: var(--rd-2);
-    border-radius: var(--rd-radius);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
     background: #f1f3f5;
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
 
     .dark & {
         background: $dark-header-bg;
@@ -349,29 +358,29 @@ export default {
 }
 
 .seg-item {
-    flex: 1;
-    padding: 6px var(--rd-1);
+    flex: 1 0 auto;
+    padding: 5px 8px;
     border: 0;
     border-radius: 6px;
     background: transparent;
-    color: #495057;
+    color: #6c757d;
+    text-align: center;
     font-size: var(--rd-fs-small);
-    line-height: 1.2;
+    line-height: 1.3;
     cursor: pointer;
-    transition: all 0.1s ease-in-out;
+    transition: background 0.1s ease-in-out, color 0.1s ease-in-out;
     white-space: nowrap;
 
-    &:hover { color: #246ca0; background: #e7edf3; }
+    &:hover { color: #111; background: #e7edf3; }
     .dark & { color: $dark-font-color; }
     .dark &:hover { color: #fff; background: $dark-bg; }
 
     &.active {
-        background: #fff;
-        color: #246ca0;
+        background: $primary;
+        color: #0d1117;
         font-weight: 600;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 
-        .dark & { background: $dark-bg; color: $primary; }
+        .dark & { background: $primary; color: $dark-bg; }
     }
 }
 
