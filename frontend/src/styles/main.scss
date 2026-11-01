@@ -673,6 +673,28 @@ code {
     color: $dark-font-color3;
 }
 
+// Bootstrap defaults body text/muted to the light palette, which turns into
+// unreadable dark-on-dark in the dark theme. Re-point both at the dark tokens.
+.dark {
+    .text-muted {
+        color: rgba($dark-font-color, 0.66) !important;
+    }
+
+    .table {
+        --bs-table-color: #{$dark-font-color};
+        --bs-table-bg: transparent;
+        --bs-table-border-color: #{$dark-border-color};
+        --bs-table-striped-bg: #{$dark-header-bg};
+        --bs-table-hover-bg: #{$dark-header-bg};
+        --bs-table-hover-color: #{$dark-font-color};
+    }
+
+    .table > thead th {
+        color: rgba($dark-font-color, 0.62);
+        border-bottom-color: $dark-border-color;
+    }
+}
+
 
 .cm-gutters {
 	background-color: transparent !important;

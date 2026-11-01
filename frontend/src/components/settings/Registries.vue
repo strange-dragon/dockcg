@@ -25,48 +25,67 @@
             </div>
         </div>
 
-        <p class="registries-hint small">{{ $t("registriesHint") }}</p>
+        <p class="page-hint small">{{ $t("registriesHint") }}</p>
 
         <section class="shadow-box configured-sources mb-4">
             <h2 class="h5">{{ $t("configuredDockerSources") }}</h2>
-            <p class="registries-hint small">{{ $t("configuredDockerSourcesHint") }}</p>
-            <p class="registries-hint small">{{ $t("configuredSourceUnverified") }}</p>
-            <div v-if="loading" class="text-muted" role="status">{{ $t("loadingResources") }}</div>
+            <p class="source-note">{{ $t("configuredDockerSourcesHint") }}</p>
+            <p class="source-note">{{ $t("configuredSourceUnverified") }}</p>
+            <div v-if="loading" class="source-note" role="status">{{ $t("loadingResources") }}</div>
             <div v-else-if="loadError" class="text-danger">{{ loadError }}</div>
             <template v-else>
-                <div class="source-group small">
-                    <strong>{{ $t("dockerLoginSources") }}</strong>
-                    <span v-if="sources.loginRegistries.length === 0" class="text-muted">{{ $t("noDockerLoginSources") }}</span>
-                    <span
-                        v-for="name in sources.loginRegistries" :key="name" class="source-chip"
-                        :title="name === 'docker.io' ? $t('defaultRegistryHint') : (managedLogin(name) ? '' : $t('sourceFromDockerConfig'))"
-                    >
-                        {{ name }}
-                        <span v-if="name === 'docker.io'" class="source-tag">{{ $t("defaultRegistry") }}</span>
-                        <button
-                            v-else-if="managedLogin(name)" class="chip-remove" type="button"
-                            :title="$t('removeSource')" @click="removeSource(managedLogin(name))"
-                        >
-                            <font-awesome-icon icon="times" />
-                        </button>
-                    </span>
-                    <button class="btn btn-sm btn-normal add-source" type="button" @click="showForm = true">
-                        <font-awesome-icon icon="plus" /> {{ $t("addRegistry") }}
-                    </button>
+                <div class="source-item">
+                    <div class="source-row">
+                        <span class="source-label">{{ $t("dockerLoginSources") }}</span>
+                        <div class="source-values">
+                            <span
+                                v-for="name in sources.loginRegistries" :key="name" class="source-chip"
+                                :title="name === 'docker.io' ? $t('defaultRegistryHint') : (managedLogin(name) ? '' : $t('sourceFromDockerConfig'))"
+                            >
+                                {{ name }}
+                                <span v-if="name === 'docker.io'" class="source-tag">{{ $t("defaultRegistry") }}</span>
+                                <button
+                                    v-else-if="managedLogin(name)" class="chip-remove" type="button"
+                                    :title="$t('removeSource')" @click="removeSource(managedLogin(name))"
+                                >
+                                    <font-awesome-icon icon="times" />
+                                </button>
+                            </span>
+                            <span v-if="sources.loginRegistries.length === 0" class="source-chip is-empty">{{ $t("noneConfigured") }}</span>
+                            <button class="source-add" type="button" @click="showForm = true">
+                                <font-awesome-icon icon="plus" />
+                                <span>{{ $t("addRegistry") }}</span>
+                            </button>
+                        </div>
+                    </div>
+                    <p v-if="sources.loginRegistries.length === 0" class="source-note source-note-body">{{ $t("noDockerLoginSources") }}</p>
                 </div>
-                <div class="source-group small">
-                    <strong>{{ $t("dockerRegistryMirrors") }}</strong>
-                    <span v-if="sources.mirrors.length === 0 && !sources.daemonError" class="text-muted">{{ $t("noDockerRegistryMirrors") }}</span>
-                    <code v-for="mirror in sources.mirrors" :key="mirror" class="source-chip">{{ mirror }}</code>
+
+                <div class="source-item">
+                    <div class="source-row">
+                        <span class="source-label">{{ $t("dockerRegistryMirrors") }}</span>
+                        <div class="source-values">
+                            <code v-for="mirror in sources.mirrors" :key="mirror" class="source-chip">{{ mirror }}</code>
+                            <span v-if="sources.mirrors.length === 0 && !sources.daemonError" class="source-chip is-empty">{{ $t("noneConfigured") }}</span>
+                        </div>
+                    </div>
+                    <p v-if="sources.mirrors.length === 0 && !sources.daemonError" class="source-note source-note-body">{{ $t("noDockerRegistryMirrors") }}</p>
                 </div>
-                <p class="registries-hint small source-path mb-0">
-                    {{ $t("registrySourcePath") }} <code>{{ sources.configPath }}</code>
-                </p>
-                <p v-if="sources.credsStore" class="registries-hint small mb-0">
-                    {{ $t("credentialsManagedBy") }} <code>{{ sources.credsStore }}</code>
-                </p>
-                <p v-if="sources.configError" class="text-warning small mb-0">{{ $t("dockerConfigReadFailed") }}</p>
-                <p v-if="sources.daemonError" class="text-warning small mb-0">{{ $t("dockerMirrorReadFailed") }}</p>
+
+                <div v-if="sources.configPath" class="source-item">
+                    <div class="source-row">
+                        <span class="source-label">{{ $t("registrySourcePath") }}</span>
+                        <div class="source-values">
+                            <code class="source-chip">{{ sources.configPath }}</code>
+                        </div>
+                    </div>
+                    <p v-if="sources.credsStore" class="source-note source-note-body">
+                        {{ $t("credentialsManagedBy") }} <code class="source-chip">{{ sources.credsStore }}</code>
+                    </p>
+                </div>
+
+                <p v-if="sources.configError" class="source-warn mb-0">{{ $t("dockerConfigReadFailed") }}</p>
+                <p v-if="sources.daemonError" class="source-warn mb-0">{{ $t("dockerMirrorReadFailed") }}</p>
             </template>
         </section>
 
@@ -111,8 +130,8 @@
         </div>
 
         <!-- List -->
-        <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle resources-table small">
+        <div class="table-responsive registry-table-wrap">
+            <table class="table table-sm table-hover align-middle registry-table small">
                 <thead>
                     <tr>
                         <th>{{ $t("registry") }}</th>
@@ -146,7 +165,7 @@
                         </td>
                     </tr>
                     <tr v-if="!loading && registries.length === 0">
-                        <td colspan="5" class="text-center text-muted py-4">{{ $t("registriesEmpty") }}</td>
+                        <td colspan="5" class="table-empty">{{ $t("registriesEmpty") }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -366,29 +385,123 @@ export default {
 <style lang="scss" scoped>
 @import "../../styles/vars.scss";
 
-.registries-hint {
-    opacity: 0.7;
+.page-hint {
+    color: #6c757d;
+
+    .dark & {
+        color: rgba($dark-font-color, 0.66);
+    }
 }
 
 .registry-endpoint { width: auto; min-width: 180px; }
-.configured-sources { padding: 16px 18px; }
-.configured-sources h2 { margin-bottom: 4px; }
-.source-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-.source-group strong { min-width: 145px; }
+
+/* ---- Configured sources ---- */
+.configured-sources {
+    padding: 16px 18px;
+
+    h2 {
+        margin-bottom: 6px;
+    }
+}
+
+.source-note {
+    margin: 0 0 4px;
+    color: #6c757d;
+    font-size: 12px;
+    line-height: 1.6;
+
+    .dark & {
+        color: rgba($dark-font-color, 0.62);
+    }
+}
+
+/* A label + values pair, with an optional explanation underneath */
+.source-item {
+    padding: 12px 0;
+
+    & + .source-item {
+        border-top: 1px solid #dee2e6;
+
+        .dark & {
+            border-color: $dark-border-color;
+        }
+    }
+
+    &:last-child {
+        padding-bottom: 0;
+    }
+}
+
+.source-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+}
+
+.source-label {
+    flex: 0 0 auto;
+    width: 92px;
+    font-size: var(--rd-fs-small);
+    font-weight: 600;
+}
+
+.source-values {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.source-note-body {
+    margin: 6px 0 0 104px;
+}
+
+/* Chips and the add button share one height so nothing overlaps */
 .source-chip {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 6px;
-    padding: 5px 9px;
-    border-radius: 7px;
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
     background: #f1f3f5;
+    color: inherit;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
     overflow-wrap: anywhere;
-}
-.dark .source-chip { background: $dark-bg2; }
 
-/* Docker Hub is built in: badge, no remove button */
-.source-tag { padding: 1px 6px; border-radius: 5px; background: rgba(0, 0, 0, 0.08); font-size: 11px; opacity: 0.75; }
-.dark .source-tag { background: rgba(255, 255, 255, 0.12); }
+    .dark & {
+        border-color: $dark-border-color;
+        background: $dark-header-bg;
+        color: $dark-font-color;
+    }
+}
+
+.source-chip.is-empty {
+    border-style: dashed;
+    opacity: 0.6;
+}
+
+/* Docker Hub is built in: a badge instead of a remove button */
+.source-tag {
+    height: 17px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.06);
+    font-size: 11px;
+    line-height: 17px;
+    opacity: 0.8;
+
+    .dark & {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
 
 .chip-remove {
     display: inline-flex;
@@ -402,27 +515,108 @@ export default {
     background: transparent;
     color: inherit;
     font-size: 10px;
-    opacity: 0.55;
+    opacity: 0.5;
     cursor: pointer;
+
+    &:hover {
+        background: rgba(0, 0, 0, 0.08);
+        opacity: 1;
+
+        .dark & {
+            background: rgba(255, 255, 255, 0.14);
+        }
+    }
 }
-.chip-remove:hover { opacity: 1; background: rgba(0, 0, 0, 0.08); }
-.dark .chip-remove:hover { background: rgba(255, 255, 255, 0.14); }
 
-.add-source { padding: 2px 8px; font-size: 12px; }
+/* Dashed affordance: reads as "add", never as a chip that is already filled */
+.source-add {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    padding: 0 10px;
+    border: 1px dashed #ced4da;
+    border-radius: 6px;
+    background: transparent;
+    color: #495057;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
 
-/* Where the list was read from, so an empty list is diagnosable */
-.source-path { margin-top: 12px; }
-.source-path code { padding: 2px 6px; border-radius: 5px; background: #f1f3f5; overflow-wrap: anywhere; }
-.dark .source-path code { background: $dark-bg2; }
+    &:hover {
+        border-color: $primary;
+        color: #2b7bb9;
+    }
+
+    .dark & {
+        border-color: rgba(255, 255, 255, 0.18);
+        color: rgba($dark-font-color, 0.9);
+
+        &:hover {
+            border-color: $primary;
+            color: $primary;
+        }
+    }
+}
+
+.source-warn {
+    margin-top: 10px;
+    color: $warning;
+    font-size: 12px;
+}
 
 .add-form {
     padding: 18px 20px;
 }
 
-.resources-table {
-    th {
+/* ---- Registry list ---- */
+.registry-table {
+    margin-bottom: 0;
+
+    thead th {
+        padding: 8px 10px;
+        border-bottom: 1px solid #dee2e6;
+        color: #6c757d;
         font-weight: 600;
         white-space: nowrap;
+
+        .dark & {
+            border-bottom-color: $dark-border-color;
+            color: rgba($dark-font-color, 0.62);
+        }
+    }
+
+    tbody td {
+        padding: 8px 10px;
+        border-color: #e9ecef;
+
+        .dark & {
+            border-color: rgba($dark-border-color, 0.8);
+        }
+    }
+
+    tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    code {
+        background: none;
+        padding: 0;
+        font-size: 12px;
+    }
+}
+
+.table-empty {
+    padding: 22px 10px !important;
+    border-bottom: 0 !important;
+    color: #6c757d;
+    text-align: center;
+
+    .dark & {
+        color: rgba($dark-font-color, 0.55);
     }
 }
 </style>
