@@ -395,5 +395,8 @@
     "savedRegistries": "已保存仓库",
     "noneConfigured": "暂无配置",
     "runningContainer": "运行中",
-    "stoppedContainer": "已停止"
+    "stoppedContainer": "已停止",
+    "overview": "概览",
+    "unmanaged": "未托管",
+    "noStacks": "还没有堆栈。"
 }

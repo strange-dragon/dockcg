@@ -1,12 +1,13 @@
 <template>
-    <div class="resource-sidebar">
-        <router-link to="/" class="overview-link" :class="{ active: activeTab === 'stacks' }">
-            <font-awesome-icon icon="layer-group" /> {{ $t("stacks") }}
-        </router-link>
-        <router-link to="/resources" class="overview-link" :class="{ active: activeTab === 'overview' }">
-            <font-awesome-icon icon="server" /> {{ $t("dockerResources") }}
-        </router-link>
-        <!-- Segmented tabs: the list below swaps with the tab, exactly like the sidebar of a desktop app -->
+    <aside class="resource-sidebar">
+        <select v-if="hasMultipleEndpoints" v-model="endpointLocal" class="form-select form-select-sm">
+            <option v-for="(agent, agentEndpoint) in $root.agentList" :key="agentEndpoint" :value="agentEndpoint">
+                {{ (agent.name !== '') ? agent.name : (agent.url || $t("currentEndpoint")) }}
+            </option>
+        </select>
+
+        <!-- One row of top-level lists. Containers are not one of them: a stack
+             owns its containers, so they live under their stack below. -->
         <div class="seg">
             <button
                 v-for="tab in tabs" :key="tab.key" class="seg-item"
@@ -17,58 +18,117 @@
             </button>
         </div>
 
-        <!-- New stacks still start from a compose file; the resource tabs are read-only -->
-        <div v-if="activeTab === 'stacks'" class="side-action">
-            <button class="btn btn-primary w-100" type="button" @click="$router.push('/compose')">
-                <font-awesome-icon icon="plus" /> {{ $t("compose") }}
-            </button>
-        </div>
+        <div class="panel">
+            <div class="panel-head">
+                <div class="search">
+                    <font-awesome-icon icon="search" class="search-icon" />
+                    <input
+                        v-model="search" class="search-input" type="search"
+                        :placeholder="searchPlaceholder" autocomplete="off"
+                    />
+                    <button v-if="search !== ''" class="search-clear" type="button" :title="$t('cancel')" @click="search = ''">
+                        <font-awesome-icon icon="times" />
+                    </button>
+                </div>
 
-        <select v-if="hasMultipleEndpoints" v-model="endpointLocal" class="form-select form-select-sm mb-2">
-            <option v-for="(agent, agentEndpoint) in $root.agentList" :key="agentEndpoint" :value="agentEndpoint">
-                {{ (agent.name !== '') ? agent.name : (agent.url || $t("currentEndpoint")) }}
-            </option>
-        </select>
-
-        <!-- Stacks keep the original Dockcg list, with its own search box -->
-        <StackList v-if="activeTab === 'stacks'" :scrollbar="true" />
-
-        <!-- Resource lists: compact rows, one badge + one name, click opens the detail page -->
-        <div v-else-if="activeTab !== 'overview'" class="shadow-box resource-list-box">
-            <div class="search-wrapper mb-2">
-                <input v-model="search" class="form-control search-input" :placeholder="$t('search')" autocomplete="off" />
-            </div>
-
-            <div class="resource-rows">
+                <!-- New stacks still start from a compose file; resource lists are read-only -->
                 <button
-                    v-for="row in loading || loadError ? [] : rows" :key="row.key" class="resource-row"
-                    :class="{ sel: row.key === selectedKey }" type="button"
-                    @click="openRow(row)"
+                    v-if="activeTab === 'stacks' || activeTab === 'overview'" class="icon-btn"
+                    type="button" :title="$t('compose')" @click="$router.push('/compose')"
                 >
-                    <span class="badge" :class="row.badgeClass">{{ $t(row.badge) }}</span>
-                    <span class="resource-name">{{ row.label }}<span v-if="row.tag" class="tag">{{ row.tag }}</span></span>
+                    <font-awesome-icon icon="plus" />
                 </button>
-
-                <div v-if="loading" class="empty" role="status">{{ $t("loadingResources") }}</div>
-                <div v-else-if="loadError" class="empty text-danger">{{ $t("resourceLoadFailed") }} {{ loadError }}</div>
-                <div v-else-if="rows.length === 0" class="empty">{{ $t("noResources") }}</div>
             </div>
 
-            <div class="resource-footer">
-                <button class="btn btn-link btn-sm p-0" type="button" :disabled="loading" @click="refresh">
-                    <font-awesome-icon icon="arrows-rotate" :spin="loading" /> {{ $t("refresh") }}
+            <div class="panel-body">
+                <!-- STACKS: a stack is a compose project, so its containers are its children -->
+                <template v-if="activeTab === 'stacks' || activeTab === 'overview'">
+                    <div v-for="(group, index) in stackGroups" :key="group.endpoint" class="stack-group">
+                        <div v-if="hasMultipleEndpoints" class="group-label" :class="{ separated: index > 0 }">{{ group.label }}</div>
+
+                        <template v-for="stack in group.stacks" :key="stackKey(stack)">
+                            <div class="row stack-row" :class="{ sel: isCurrentStack(stack) }">
+                                <button
+                                    class="caret" :class="{ open: isOpen(stack) }" type="button"
+                                    :title="$t('containers')" @click="toggle(stack)"
+                                >
+                                    <font-awesome-icon icon="chevron-down" />
+                                </button>
+                                <router-link :to="stackUrl(stack)" class="row-name">{{ stack.name }}</router-link>
+                                <span v-if="containerCount(stack) > 0" class="row-count">{{ containerCount(stack) }}</span>
+                                <Uptime :stack="stack" />
+                            </div>
+
+                            <div v-if="isOpen(stack)" class="children">
+                                <button
+                                    v-for="container in containersOf(stack)" :key="container.id" class="row child"
+                                    :class="{ sel: container.id === selectedContainerId }" type="button"
+                                    :title="`${container.image} · ${container.state}`" @click="openContainer(container)"
+                                >
+                                    <span class="dot" :class="{ on: container.state === 'running' }"></span>
+                                    <span class="row-name">{{ container.service || container.name }}</span>
+                                </button>
+                                <div v-if="containersOf(stack).length === 0" class="hint">{{ $t("noResources") }}</div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div v-if="stackGroups.length === 0" class="empty">
+                        {{ search !== "" ? $t("noResources") : $t("noStacks") }}
+                    </div>
+
+                    <!-- Containers that no compose file owns -->
+                    <div v-if="unmanaged.length > 0" class="stack-group">
+                        <div class="group-label separated">
+                            {{ $t("unmanaged") }} <span class="row-count">{{ unmanaged.length }}</span>
+                        </div>
+                        <button
+                            v-for="container in unmanaged" :key="container.id" class="row child"
+                            :class="{ sel: container.id === selectedContainerId }" type="button"
+                            :title="`${container.image} · ${container.state}`" @click="openContainer(container)"
+                        >
+                            <span class="dot" :class="{ on: container.state === 'running' }"></span>
+                            <span class="row-name">{{ container.name }}</span>
+                        </button>
+                    </div>
+                </template>
+
+                <!-- IMAGES / VOLUMES / NETWORKS -->
+                <template v-else>
+                    <button
+                        v-for="row in loading || loadError ? [] : rows" :key="row.key" class="row resource-row"
+                        :class="{ sel: row.key === selectedKey }" type="button"
+                        @click="openRow(row)"
+                    >
+                        <span class="badge" :class="row.badgeClass">{{ $t(row.badge) }}</span>
+                        <span class="row-name">{{ row.label }}<span v-if="row.tag" class="tag">{{ row.tag }}</span></span>
+                    </button>
+
+                    <div v-if="loading" class="empty" role="status">{{ $t("loadingResources") }}</div>
+                    <div v-else-if="loadError" class="empty error">{{ $t("resourceLoadFailed") }} {{ loadError }}</div>
+                    <div v-else-if="rows.length === 0" class="empty">{{ $t("noResources") }}</div>
+                </template>
+            </div>
+
+            <div class="panel-foot">
+                <router-link to="/resources" class="foot-link" :class="{ active: activeTab === 'overview' }">
+                    {{ $t("overview") }}
+                </router-link>
+                <button class="foot-refresh" type="button" :disabled="loading" :title="$t('refresh')" @click="refresh">
+                    <font-awesome-icon icon="arrows-rotate" :spin="loading" />
                 </button>
             </div>
         </div>
-    </div>
+    </aside>
 </template>
 
 <script>
-import StackList from "./StackList.vue";
+import { RUNNING } from "../../../common/util-common";
+import Uptime from "./Uptime.vue";
 
 const TABS = [
-    { key: "containers",
-        label: "containers" },
+    { key: "stacks",
+        label: "stacks" },
     { key: "images",
         label: "images" },
     { key: "volumes",
@@ -77,9 +137,28 @@ const TABS = [
         label: "networks" },
 ];
 
+/** Stacks keep Dockge's ordering: managed first, then running, then by name. */
+function compareStacks(m1, m2) {
+    if (m1.isManagedByDockcg && !m2.isManagedByDockcg) {
+        return -1;
+    }
+    if (!m1.isManagedByDockcg && m2.isManagedByDockcg) {
+        return 1;
+    }
+    if (m1.status !== m2.status) {
+        if (m2.status === RUNNING) {
+            return 1;
+        }
+        if (m1.status === RUNNING) {
+            return -1;
+        }
+    }
+    return m1.name.localeCompare(m2.name);
+}
+
 export default {
     components: {
-        StackList,
+        Uptime,
     },
 
     props: {
@@ -102,6 +181,7 @@ export default {
             containers: [],
             volumes: [],
             networks: [],
+            openStacks: {},
         };
     },
 
@@ -118,13 +198,17 @@ export default {
             if (path.startsWith("/resources/networks")) {
                 return "networks";
             }
-            if (path.startsWith("/resources/containers")) {
-                return "containers";
-            }
             if (path === "/resources") {
                 return "overview";
             }
             return "stacks";
+        },
+
+        searchPlaceholder() {
+            if (this.activeTab === "stacks" || this.activeTab === "overview") {
+                return `${this.$t("search")} — ${this.$t("stacks")} / ${this.$t("containers")}`;
+            }
+            return this.$t("search");
         },
 
         hasMultipleEndpoints() {
@@ -140,27 +224,84 @@ export default {
             },
         },
 
+        /** Selected item in the resource lists (also drives the detail pages) */
         selectedKey() {
             return this.$route.query.name || "";
+        },
+
+        /** A container detail page is open when the route points at one */
+        selectedContainerId() {
+            return this.$route.path.startsWith("/resources/containers") ? (this.$route.query.name || "") : "";
+        },
+
+        allStacks() {
+            return Object.values(this.$root.completeStackList || {});
+        },
+
+        /* Stacks, filtered by their own name or by any of their containers */
+        filteredStacks() {
+            const keyword = this.search.trim().toLowerCase();
+
+            if (keyword === "") {
+                return [ ...this.allStacks ].sort(compareStacks);
+            }
+
+            return this.allStacks.filter((stack) => {
+                if (stack.name.toLowerCase().includes(keyword)) {
+                    return true;
+                }
+                return this.containersOf(stack).some((container) => String(container.name).toLowerCase().includes(keyword)
+                    || String(container.service).toLowerCase().includes(keyword)
+                    || String(container.image).toLowerCase().includes(keyword));
+            }).sort(compareStacks);
+        },
+
+        /* Same endpoint grouping Dockge uses, with the local endpoint first */
+        stackGroups() {
+            const groups = new Map();
+
+            for (const stack of this.filteredStacks) {
+                const endpoint = stack.endpoint || "current";
+                if (!groups.has(endpoint)) {
+                    groups.set(endpoint, []);
+                }
+                groups.get(endpoint).push(stack);
+            }
+
+            return [ ...groups.entries() ].map(([ endpoint, stacks ]) => ({
+                endpoint,
+                label: endpoint === "current" ? this.$t("currentEndpoint") : endpoint,
+                stacks,
+            })).sort((a, b) => {
+                if (a.endpoint === "current" && b.endpoint !== "current") {
+                    return -1;
+                }
+                if (a.endpoint !== "current" && b.endpoint === "current") {
+                    return 1;
+                }
+                return a.endpoint.localeCompare(b.endpoint);
+            });
+        },
+
+        /* Containers no compose file claims — they get their own small group */
+        unmanaged() {
+            const keyword = this.search.trim().toLowerCase();
+
+            return this.containers.filter((container) => {
+                if (container.stack) {
+                    return false;
+                }
+                if (keyword === "") {
+                    return true;
+                }
+                return String(container.name).toLowerCase().includes(keyword)
+                    || String(container.image).toLowerCase().includes(keyword);
+            });
         },
 
         rows() {
             const keyword = this.search.trim().toLowerCase();
             const match = (text) => !keyword || String(text).toLowerCase().includes(keyword);
-
-            if (this.activeTab === "containers") {
-                return this.containers
-                    .filter((container) => match(container.name) || match(container.image) || match(container.id))
-                    .map((container) => ({
-                        key: container.id,
-                        label: container.name,
-                        tag: ` · ${container.image}`,
-                        badge: container.state === "running" ? "runningContainer" : "stoppedContainer",
-                        badgeClass: container.state === "running" ? "bg-primary" : "bg-secondary",
-                        type: "containers",
-                        query: container.id,
-                    }));
-            }
 
             if (this.activeTab === "images") {
                 return this.images
@@ -224,9 +365,13 @@ export default {
                 this.refresh();
             }
         },
+        "$route.params.stackName"() {
+            this.expandCurrentStack();
+        },
     },
 
     mounted() {
+        this.expandCurrentStack();
         this.refresh();
     },
 
@@ -239,6 +384,61 @@ export default {
             }
         },
 
+        stackKey(stack) {
+            return `${stack.name}_${stack.endpoint || "current"}`;
+        },
+
+        stackUrl(stack) {
+            if (stack.endpoint) {
+                return `/compose/${stack.name}/${stack.endpoint}`;
+            }
+            return `/compose/${stack.name}`;
+        },
+
+        isCurrentStack(stack) {
+            return this.$route.params.stackName === stack.name;
+        },
+
+        isOpen(stack) {
+            return this.openStacks[this.stackKey(stack)] === true;
+        },
+
+        toggle(stack) {
+            const key = this.stackKey(stack);
+            this.openStacks[key] = !this.openStacks[key];
+        },
+
+        /** Keep the stack you are editing open, so its containers are visible */
+        expandCurrentStack() {
+            const name = this.$route.params.stackName;
+            if (!name) {
+                return;
+            }
+            const endpoint = this.$route.params.endpoint || "current";
+            this.openStacks[`${name}_${endpoint}`] = true;
+        },
+
+        /**
+         * Containers of a stack. Containers are listed for the selected agent
+         * only, so a stack that belongs to another agent has no children here.
+         */
+        containersOf(stack) {
+            const stackEndpoint = stack.endpoint || "current";
+            if (this.hasMultipleEndpoints && stackEndpoint !== (this.endpoint || "current")) {
+                return [];
+            }
+            return this.containers.filter((container) => container.stack === stack.name);
+        },
+
+        containerCount(stack) {
+            return this.containersOf(stack).length;
+        },
+
+        openContainer(container) {
+            this.$router.push({ path: "/resources/containers",
+                query: { name: container.id } });
+        },
+
         openRow(row) {
             this.$router.push({ path: `/resources/${row.type}`,
                 query: { name: row.query } });
@@ -246,72 +446,47 @@ export default {
 
         refresh() {
             const requestId = ++this.requestId;
+            const done = (res, apply) => {
+                if (requestId !== this.requestId) {
+                    return;
+                }
+                this.loading = false;
+                if (res && res.ok) {
+                    apply(res);
+                } else {
+                    this.loadError = res?.msg || this.$t("unknownError");
+                }
+            };
+
             this.loadError = "";
-            if (this.activeTab === "containers") {
-                this.loading = true;
-                this.$root.emitAgent(this.endpoint, "getDockerContainerMigrationList", (res) => {
-                    if (requestId !== this.requestId) {
-                        return;
-                    }
-                    this.loading = false;
-                    if (res?.ok) {
-                        this.containers = res.containers;
-                    } else {
-                        this.loadError = res?.msg || this.$t("unknownError");
-                    }
-                });
-                return;
-            }
+            this.loading = true;
+
             if (this.activeTab === "images") {
-                this.loading = true;
-                this.$root.emitAgent(this.endpoint, "getDockerImageList", (res) => {
-                    if (requestId !== this.requestId) {
-                        return;
-                    }
-                    this.loading = false;
-                    if (res.ok) {
-                        this.images = res.images;
-                    } else {
-                        this.loadError = res?.msg || this.$t("unknownError");
-                    }
-                });
+                this.$root.emitAgent(this.endpoint, "getDockerImageList", (res) => done(res, (r) => {
+                    this.images = r.images;
+                }));
                 return;
             }
 
             if (this.activeTab === "volumes") {
-                this.loading = true;
-                this.$root.emitAgent(this.endpoint, "getDockerVolumeList", (res) => {
-                    if (requestId !== this.requestId) {
-                        return;
-                    }
-                    this.loading = false;
-                    if (res.ok) {
-                        this.volumes = res.volumes;
-                    } else {
-                        this.loadError = res?.msg || this.$t("unknownError");
-                    }
-                });
+                this.$root.emitAgent(this.endpoint, "getDockerVolumeList", (res) => done(res, (r) => {
+                    this.volumes = r.volumes;
+                }));
                 return;
             }
 
             if (this.activeTab === "networks") {
-                this.loading = true;
-                this.$root.emitAgent(this.endpoint, "getDockerNetworkResourceList", (res) => {
-                    if (requestId !== this.requestId) {
-                        return;
-                    }
-                    this.loading = false;
-                    if (res.ok) {
-                        this.networks = res.networks;
-                    } else {
-                        this.loadError = res?.msg || this.$t("unknownError");
-                    }
-                });
+                this.$root.emitAgent(this.endpoint, "getDockerNetworkResourceList", (res) => done(res, (r) => {
+                    this.networks = r.networks;
+                }));
                 return;
             }
-            this.loading = false;
-        },
 
+            // Stacks: the container list tells us what each stack is running
+            this.$root.emitAgent(this.endpoint, "getDockerContainerMigrationList", (res) => done(res, (r) => {
+                this.containers = r.containers;
+            }));
+        },
     },
 };
 </script>
@@ -320,37 +495,19 @@ export default {
 @import "../styles/vars.scss";
 @import "../styles/resource-tokens.scss";
 
-.overview-link {
-    display: block;
-    padding: var(--rd-2) var(--rd-3);
-    margin-bottom: var(--rd-2);
-    border-radius: var(--rd-radius);
-    color: #343a40;
-    text-decoration: none;
-    font-weight: 600;
-
-    &:hover, &.active { background: #eef4fa; color: #246ca0; }
-    .dark & { color: $dark-font-color; }
-    .dark &:hover, .dark &.active { background: $dark-header-bg; color: $primary; }
+.resource-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--rd-2);
 }
 
-/* Single-row segmented control, as in docs/screenshots: a quiet track with one
- * filled pill for the active tab. Never wraps to a second row — narrow
- * sidebars scroll horizontally instead. */
+/* Top-level lists: one quiet track, one filled pill. Never wraps. */
 .seg {
     display: flex;
     gap: 2px;
     padding: 3px;
-    margin-bottom: var(--rd-2);
-    border: 1px solid var(--card-border);
-    border-radius: 8px;
-    background: #f1f3f5;
-    overflow-x: auto;
-    scrollbar-width: none;
-
-    &::-webkit-scrollbar {
-        display: none;
-    }
+    border-radius: var(--rd-radius);
+    background: #eceff3;
 
     .dark & {
         background: $dark-header-bg;
@@ -358,106 +515,375 @@ export default {
 }
 
 .seg-item {
-    flex: 1 0 auto;
-    padding: 5px 8px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--rd-radius-sm);
     background: transparent;
-    color: #6c757d;
-    text-align: center;
+    color: #5c6773;
     font-size: var(--rd-fs-small);
-    line-height: 1.3;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     cursor: pointer;
     transition: background 0.1s ease-in-out, color 0.1s ease-in-out;
-    white-space: nowrap;
 
-    &:hover { color: #111; background: #e7edf3; }
-    .dark & { color: $dark-font-color; }
-    .dark &:hover { color: #fff; background: $dark-bg; }
+    &:hover {
+        color: #111;
+        background: rgba(0, 0, 0, 0.04);
+    }
+
+    .dark & {
+        color: $dark-font-color;
+    }
+
+    .dark &:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.04);
+    }
 
     &.active {
         background: $primary;
-        color: #0d1117;
+        color: #0b1a26;
         font-weight: 600;
 
-        .dark & { background: $primary; color: $dark-bg; }
+        .dark & {
+            background: $primary;
+            color: #071a27;
+        }
     }
 }
 
-.side-action {
-    margin-bottom: var(--rd-2);
-}
-
-.resource-list-box {
-    padding: var(--rd-3);
+.panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: calc(100vh - 190px);
+    position: sticky;
+    top: 10px;
+    border: 1px solid var(--card-border);
     border-radius: var(--rd-radius);
+    background: #fff;
+    overflow: hidden;
+
+    .dark & {
+        background: $dark-bg;
+    }
 }
 
-.resource-rows {
-    max-height: calc(100vh - 340px);
-    overflow-y: auto;
-}
-
-.resource-row {
+.panel-head {
     display: flex;
     align-items: center;
     gap: var(--rd-2);
+    padding: var(--rd-2);
+    border-bottom: 1px solid var(--card-border);
+
+    .dark & {
+        background: $dark-header-bg;
+    }
+}
+
+.search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.search-icon {
+    position: absolute;
+    left: 9px;
+    color: var(--dim);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.search-input {
     width: 100%;
-    padding: var(--rd-2) var(--rd-3);
+    height: 30px;
+    padding: 0 26px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--rd-radius-sm);
+    background: var(--panel-bg);
+    color: inherit;
+    font-size: var(--rd-fs-small);
+    line-height: 30px;
+    outline: none;
+
+    &::placeholder {
+        color: var(--dim);
+    }
+
+    &::-webkit-search-cancel-button {
+        display: none;
+    }
+
+    &:focus {
+        border-color: $primary;
+        background: transparent;
+    }
+
+    .dark & {
+        background: $dark-bg2;
+    }
+}
+
+.search-clear {
+    position: absolute;
+    right: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--dim);
+    font-size: 10px;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--strong);
+    }
+}
+
+.icon-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--rd-radius-sm);
+    background: $primary;
+    color: #08202e;
+    font-size: 13px;
+    cursor: pointer;
+    transition: filter 0.1s ease-in-out;
+
+    &:hover {
+        filter: brightness(1.08);
+    }
+}
+
+.panel-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: var(--rd-1) var(--rd-2) var(--rd-2);
+    overflow-y: auto;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 5px 6px;
     border: 0;
     border-radius: var(--rd-radius-sm);
     background: transparent;
     color: inherit;
     text-align: left;
+    font-size: var(--rd-fs-small);
+    line-height: 1.4;
     cursor: pointer;
     transition: background 0.1s ease-in-out;
 
     &:hover {
-        background: #f1f3f5;
-        .dark & { background: $dark-header-bg; }
+        background: var(--panel-bg);
     }
 
-    /* Sunken selection instead of a highlighted border */
+    .dark &:hover {
+        background: $dark-header-bg;
+    }
+
     &.sel {
-        background: #e7f2fb;
-        color: #185a87;
-        .dark & { background: $dark-bg2; color: $primary; }
+        background: rgba($primary, 0.18);
+
+        .dark & {
+            background: rgba($primary, 0.14);
+        }
+    }
+}
+
+.row-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.stack-row .row-name {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 500;
+
+    &:hover {
+        color: $primary;
+    }
+}
+
+.row-count {
+    flex: 0 0 auto;
+    color: var(--dim);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.stack-row .badge {
+    flex: 0 0 auto;
+    min-width: 56px;
+    font-weight: 500;
+}
+
+.caret {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--dim);
+    font-size: 10px;
+    cursor: pointer;
+
+    svg {
+        transition: transform 0.12s ease-in-out;
+        transform: rotate(-90deg);
     }
 
-    .badge {
-        flex: 0 0 auto;
+    &.open svg {
+        transform: rotate(0deg);
     }
 
-    .resource-name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
+    &:hover {
+        color: var(--strong);
+        background: var(--panel-bg);
 
-    .tag {
-        color: var(--muted);
+        .dark & {
+            background: $dark-bg2;
+        }
     }
+}
+
+.children {
+    padding-left: 18px;
+}
+
+.child {
+    padding-left: 6px;
+    color: var(--muted);
+}
+
+.dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dim);
+
+    &.on {
+        background: $primary;
+    }
+}
+
+.group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 6px 4px;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+
+    &.separated {
+        margin-top: var(--rd-1);
+        border-top: 1px solid var(--card-border);
+    }
+}
+
+.hint {
+    padding: 2px 6px 6px;
+    color: var(--dim);
+    font-size: 12px;
+}
+
+.resource-row .badge {
+    flex: 0 0 auto;
+}
+
+.resource-row .tag {
+    color: var(--muted);
 }
 
 .empty {
-    padding: var(--rd-4) var(--rd-2);
+    padding: var(--rd-5) var(--rd-2);
     text-align: center;
     color: var(--muted);
     font-size: var(--rd-fs-small);
-}
 
-.resource-footer {
-    padding-top: 6px;
-    text-align: right;
-
-    .btn-link {
-        color: var(--muted);
-        text-decoration: none;
-        font-size: var(--rd-fs-small);
+    &.error {
+        color: $danger;
     }
 }
 
-.search-input {
+.panel-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px var(--rd-2);
+    border-top: 1px solid var(--card-border);
+
+    .dark & {
+        background: $dark-header-bg;
+    }
+}
+
+.foot-link {
+    padding: 3px 6px;
+    border-radius: var(--rd-radius-sm);
+    color: var(--muted);
     font-size: var(--rd-fs-small);
+    text-decoration: none;
+
+    &:hover,
+    &.active {
+        color: $primary;
+    }
+}
+
+.foot-refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--rd-radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        color: $primary;
+    }
+
+    &:disabled {
+        opacity: 0.6;
+    }
 }
 </style>

@@ -395,5 +395,8 @@
     "savedRegistries": "Saved registries",
     "noneConfigured": "None configured",
     "runningContainer": "Running",
-    "stoppedContainer": "Stopped"
+    "stoppedContainer": "Stopped",
+    "overview": "Overview",
+    "unmanaged": "Unmanaged",
+    "noStacks": "No stacks yet."
 }

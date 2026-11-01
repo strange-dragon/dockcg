@@ -16,12 +16,14 @@ A compose-first stack manager for Docker, forked from [Dockge](https://github.co
 
 New in this fork, on top of an otherwise unchanged compose workflow:
 
-- **Containers** — read-only inventory; any container can be turned into a **Compose draft** (image, env, ports, mounts, restart policy, networks). The original is never stopped or deleted.
+- **Containers** — listed under the stack that owns them: expand a stack in the sidebar to see what it runs. Containers no compose file claims get their own group. Any container can be turned into a **Compose draft** (image, env, ports, mounts, restart policy, networks); the original is never stopped or deleted.
 - **Images** — in-use / unused / dangling state, containers using each image, all tags of the same ID, digest, platform, targeted delete, previewed prune.
 - **Volumes** — mountpoint, owning stack + service, orphan cleanup, disk usage on demand.
 - **Networks** — inventory plus a relationship view: drag a service onto a network and its `compose.yaml` is edited for you (previewed, hash-guarded). Merge networks the same way. Unmanaged containers get an `external: true` snippet.
 - **Registries** — Docker Hub / ghcr.io / Harbor credentials, `docker login` in the background, password encrypted at rest.
 - **Overview** — one page with counts and previewed cleanup for all four resource types.
+
+The sidebar is one list with one search box: stacks / images / volumes / networks at the top, and a stack expands into its containers.
 
 Nothing here creates an image, volume or network: **new objects only ever come from a compose file**, and the resources section can inspect, edit the compose file or delete — never add.
 
