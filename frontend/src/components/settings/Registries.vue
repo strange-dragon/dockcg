@@ -41,7 +41,10 @@
                         v-for="name in sources.loginRegistries" :key="name" class="src-item"
                         :title="loginSourceTitle(name)"
                     >
-                        <span class="src-mark" :style="{ background: sourceColor(name) }">{{ sourceInitial(name) }}</span>
+                        <span class="src-mark" :style="{ background: sourceColor(name) }">
+                            <font-awesome-icon v-if="sourceIcon(name)" :icon="['fab', sourceIcon(name)]" />
+                            <template v-else>{{ sourceInitial(name) }}</template>
+                        </span>
                         <div class="src-body">
                             <span class="src-name">{{ name }}</span>
                             <span class="src-meta">{{ loginSourceMeta(name) }}</span>
@@ -72,7 +75,10 @@
                 <div class="src-group-title">{{ $t("dockerRegistryMirrors") }}</div>
                 <div class="src-list">
                     <div v-for="mirror in sources.mirrors" :key="mirror" class="src-item">
-                        <span class="src-mark" :style="{ background: sourceColor(mirror) }">{{ sourceInitial(mirror) }}</span>
+                        <span class="src-mark" :style="{ background: sourceColor(mirror) }">
+                            <font-awesome-icon v-if="sourceIcon(mirror)" :icon="['fab', sourceIcon(mirror)]" />
+                            <template v-else>{{ sourceInitial(mirror) }}</template>
+                        </span>
                         <div class="src-body">
                             <span class="src-name">{{ mirror }}</span>
                             <span class="src-meta">{{ $t("sourceDaemonMirror") }}</span>
@@ -136,7 +142,10 @@
         <div class="src-group-title saved-title">{{ $t("savedRegistries") }}</div>
         <div class="src-list saved-list">
             <div v-for="registry in registries" :key="registry.id" class="src-item">
-                <span class="src-mark" :style="{ background: sourceColor(registry.url) }">{{ sourceInitial(registry.url) }}</span>
+                <span class="src-mark" :style="{ background: sourceColor(registry.url) }">
+                    <font-awesome-icon v-if="sourceIcon(registry.url)" :icon="['fab', sourceIcon(registry.url)]" />
+                    <template v-else>{{ sourceInitial(registry.url) }}</template>
+                </span>
                 <div class="src-body">
                     <span class="src-name">{{ registry.name || registry.url }}</span>
                     <span class="src-meta">
@@ -208,6 +217,19 @@ const SOURCE_PALETTE = [
     "#06b6d4",
     "#ef4444",
     "#84cc16",
+];
+
+/*
+ * Brand mark for well-known registries; anything else falls back to the first
+ * letter of its host, so an unknown registry still gets a recognisable block.
+ */
+const SOURCE_ICONS = [
+    [ /(^|\\.)docker\\.(io|com)$/, "docker" ],
+    [ /^ghcr\\.io$/, "github" ],
+    [ /gitlab/, "gitlab" ],
+    [ /quay\\.io|redhat/, "redhat" ],
+    [ /ecr|amazonaws/, "aws" ],
+    [ /gcr\\.io|pkg\\.dev|googleapis|google/, "google" ],
 ];
 
 /** Strips scheme, port-less path and trailing slash: `https://a.io/v2/` -> `a.io` */
@@ -298,6 +320,13 @@ export default {
         sourceInitial(value) {
             const host = sourceHost(value).replace(/^[^a-z0-9]+/, "");
             return (host[0] || "?").toUpperCase();
+        },
+
+        /** Font Awesome brand name for a known host, otherwise null */
+        sourceIcon(value) {
+            const host = sourceHost(value);
+            const match = SOURCE_ICONS.find(([ pattern ]) => pattern.test(host));
+            return match ? match[1] : null;
         },
 
         /** Why this host shows up here: built in, saved in Dockcg, or from config.json */

@@ -67,6 +67,17 @@ import {
     faCircleInfo,
 } from "@fortawesome/free-solid-svg-icons";
 
+// Brand icons used to label registry sources by host
+// https://fontawesome.com/v6/icons?d=gallery&p=2&s=brands&m=free
+import {
+    faDocker,
+    faGithub,
+    faGitlab,
+    faAws,
+    faGoogle,
+    faRedhat,
+} from "@fortawesome/free-brands-svg-icons";
+
 library.add(
     faArrowAltCircleUp,
     faCog,
@@ -131,6 +142,12 @@ library.add(
     faShareNodes,
     faGripVertical,
     faCircleInfo,
+    faDocker,
+    faGithub,
+    faGitlab,
+    faAws,
+    faGoogle,
+    faRedhat,
 );
 
 export { FontAwesomeIcon };
