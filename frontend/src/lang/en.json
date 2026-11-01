@@ -420,5 +420,7 @@
     "defaultRegistry": "Default",
     "defaultRegistryHint": "Docker Hub is the built-in registry and cannot be removed",
     "removeSource": "Remove",
-    "sourceFromDockerConfig": "Comes from the Docker config (config.json) and cannot be removed here"
+    "sourceFromDockerConfig": "Comes from the Docker config (config.json) and cannot be removed here",
+    "sourceManagedInDockcg": "Saved in Dockcg, edit it below",
+    "sourceDaemonMirror": "From the Docker daemon, edit daemon.json"
 }

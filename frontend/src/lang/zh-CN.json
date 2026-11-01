@@ -420,5 +420,7 @@
     "defaultRegistry": "默认",
     "defaultRegistryHint": "Docker Hub 是内置仓库，不能移除",
     "removeSource": "移除",
-    "sourceFromDockerConfig": "来自 Docker 配置（config.json），不能在这里移除"
+    "sourceFromDockerConfig": "来自 Docker 配置（config.json），不能在这里移除",
+    "sourceManagedInDockcg": "已保存在 Dockcg，可在下方修改",
+    "sourceDaemonMirror": "来自 Docker 守护进程，需修改 daemon.json"
 }

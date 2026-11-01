@@ -34,54 +34,56 @@
             <div v-if="loading" class="source-note" role="status">{{ $t("loadingResources") }}</div>
             <div v-else-if="loadError" class="text-danger">{{ loadError }}</div>
             <template v-else>
-                <div class="source-item">
-                    <div class="source-row">
-                        <span class="source-label">{{ $t("dockerLoginSources") }}</span>
-                        <div class="source-values">
-                            <span
-                                v-for="name in sources.loginRegistries" :key="name" class="source-chip"
-                                :title="name === 'docker.io' ? $t('defaultRegistryHint') : (managedLogin(name) ? '' : $t('sourceFromDockerConfig'))"
+                <div class="src-group-title">{{ $t("dockerLoginSources") }}</div>
+                <div class="src-list">
+                    <div
+                        v-for="name in sources.loginRegistries" :key="name" class="src-item"
+                        :title="name === 'docker.io' ? $t('defaultRegistryHint') : (managedLogin(name) ? '' : $t('sourceFromDockerConfig'))"
+                    >
+                        <span class="src-mark" :style="{ background: sourceColor(name) }">{{ sourceInitial(name) }}</span>
+                        <div class="src-body">
+                            <span class="src-name">{{ name }}</span>
+                            <span class="src-meta">{{ loginSourceMeta(name) }}</span>
+                        </div>
+                        <div class="src-actions">
+                            <button
+                                v-if="managedLogin(name)" class="btn btn-sm btn-normal" type="button"
+                                :title="$t('removeSource')" @click="removeSource(managedLogin(name))"
                             >
-                                {{ name }}
-                                <span v-if="name === 'docker.io'" class="source-tag">{{ $t("defaultRegistry") }}</span>
-                                <button
-                                    v-else-if="managedLogin(name)" class="chip-remove" type="button"
-                                    :title="$t('removeSource')" @click="removeSource(managedLogin(name))"
-                                >
-                                    <font-awesome-icon icon="times" />
-                                </button>
-                            </span>
-                            <span v-if="sources.loginRegistries.length === 0" class="source-chip is-empty">{{ $t("noneConfigured") }}</span>
-                            <button class="source-add" type="button" @click="showForm = true">
-                                <font-awesome-icon icon="plus" />
-                                <span>{{ $t("addRegistry") }}</span>
+                                <font-awesome-icon icon="times" />
                             </button>
                         </div>
                     </div>
-                    <p v-if="sources.loginRegistries.length === 0" class="source-note source-note-body">{{ $t("noDockerLoginSources") }}</p>
-                </div>
-
-                <div class="source-item">
-                    <div class="source-row">
-                        <span class="source-label">{{ $t("dockerRegistryMirrors") }}</span>
-                        <div class="source-values">
-                            <code v-for="mirror in sources.mirrors" :key="mirror" class="source-chip">{{ mirror }}</code>
-                            <span v-if="sources.mirrors.length === 0 && !sources.daemonError" class="source-chip is-empty">{{ $t("noneConfigured") }}</span>
+                    <div v-if="sources.loginRegistries.length === 0" class="src-item is-empty">
+                        <span class="src-mark is-empty"><font-awesome-icon icon="plus" /></span>
+                        <div class="src-body">
+                            <span class="src-name">{{ $t("noneConfigured") }}</span>
+                            <span class="src-meta">{{ $t("noDockerLoginSources") }}</span>
+                        </div>
+                        <div class="src-actions">
+                            <button class="btn btn-sm btn-normal" type="button" @click="showForm = true">
+                                <font-awesome-icon icon="plus" class="me-1" />{{ $t("addRegistry") }}
+                            </button>
                         </div>
                     </div>
-                    <p v-if="sources.mirrors.length === 0 && !sources.daemonError" class="source-note source-note-body">{{ $t("noDockerRegistryMirrors") }}</p>
                 </div>
 
-                <div v-if="sources.configPath" class="source-item">
-                    <div class="source-row">
-                        <span class="source-label">{{ $t("registrySourcePath") }}</span>
-                        <div class="source-values">
-                            <code class="source-chip">{{ sources.configPath }}</code>
+                <div class="src-group-title">{{ $t("dockerRegistryMirrors") }}</div>
+                <div class="src-list">
+                    <div v-for="mirror in sources.mirrors" :key="mirror" class="src-item">
+                        <span class="src-mark" :style="{ background: sourceColor(mirror) }">{{ sourceInitial(mirror) }}</span>
+                        <div class="src-body">
+                            <span class="src-name">{{ mirror }}</span>
+                            <span class="src-meta">{{ $t("sourceDaemonMirror") }}</span>
                         </div>
                     </div>
-                    <p v-if="sources.credsStore" class="source-note source-note-body">
-                        {{ $t("credentialsManagedBy") }} <code class="source-chip">{{ sources.credsStore }}</code>
-                    </p>
+                    <div v-if="sources.mirrors.length === 0 && !sources.daemonError" class="src-item is-empty">
+                        <span class="src-mark is-empty"><font-awesome-icon icon="circle-info" /></span>
+                        <div class="src-body">
+                            <span class="src-name">{{ $t("noneConfigured") }}</span>
+                            <span class="src-meta">{{ $t("noDockerRegistryMirrors") }}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <p v-if="sources.configError" class="source-warn mb-0">{{ $t("dockerConfigReadFailed") }}</p>
@@ -129,46 +131,45 @@
             </form>
         </div>
 
-        <!-- List -->
-        <div class="table-responsive registry-table-wrap">
-            <table class="table table-sm table-hover align-middle registry-table small">
-                <thead>
-                    <tr>
-                        <th>{{ $t("registry") }}</th>
-                        <th>{{ $t("url") }}</th>
-                        <th>{{ $t("Username") }}</th>
-                        <th>{{ $t("created") }}</th>
-                        <th class="text-end">{{ $t("actions") }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="registry in registries" :key="registry.id">
-                        <td>{{ registry.name }}</td>
-                        <td><code>{{ registry.url }}</code></td>
-                        <td>{{ registry.username }}</td>
-                        <td class="text-nowrap text-muted">{{ formatDate(registry.createdDate) }}</td>
-                        <td class="text-end text-nowrap">
-                            <button
-                                class="btn btn-sm btn-normal me-1"
-                                :disabled="syncingId === registry.id"
-                                :title="$t('relogin')"
-                                @click="relogin(registry)"
-                            >
-                                <font-awesome-icon icon="rotate" :spin="syncingId === registry.id" />
-                            </button>
-                            <button class="btn btn-sm btn-normal me-1" :title="$t('Edit')" @click="editRegistry(registry)">
-                                <font-awesome-icon icon="pen" />
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" :title="$t('delete')" @click="askRemove(registry)">
-                                <font-awesome-icon icon="trash" />
-                            </button>
-                        </td>
-                    </tr>
-                    <tr v-if="!loading && registries.length === 0">
-                        <td colspan="5" class="table-empty">{{ $t("registriesEmpty") }}</td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- Saved registries, in the same row language as the stack list -->
+        <div class="src-group-title saved-title">{{ $t("savedRegistries") }}</div>
+        <div class="src-list saved-list">
+            <div v-for="registry in registries" :key="registry.id" class="src-item">
+                <span class="src-mark" :style="{ background: sourceColor(registry.url) }">{{ sourceInitial(registry.url) }}</span>
+                <div class="src-body">
+                    <span class="src-name">{{ registry.name || registry.url }}</span>
+                    <span class="src-meta">
+                        {{ registry.url }}<template v-if="registry.username"> · {{ registry.username }}</template> · {{ formatDate(registry.createdDate) }}
+                    </span>
+                </div>
+                <div class="src-actions">
+                    <button
+                        class="btn btn-sm btn-normal"
+                        :disabled="syncingId === registry.id"
+                        :title="$t('relogin')"
+                        @click="relogin(registry)"
+                    >
+                        <font-awesome-icon icon="rotate" :spin="syncingId === registry.id" />
+                    </button>
+                    <button class="btn btn-sm btn-normal" :title="$t('Edit')" @click="editRegistry(registry)">
+                        <font-awesome-icon icon="pen" />
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" :title="$t('delete')" @click="askRemove(registry)">
+                        <font-awesome-icon icon="trash" />
+                    </button>
+                </div>
+            </div>
+            <div v-if="!loading && registries.length === 0" class="src-item is-empty">
+                <span class="src-mark is-empty"><font-awesome-icon icon="plus" /></span>
+                <div class="src-body">
+                    <span class="src-name">{{ $t("registriesEmpty") }}</span>
+                </div>
+                <div class="src-actions">
+                    <button class="btn btn-sm btn-normal" type="button" @click="showForm = true">
+                        <font-awesome-icon icon="plus" class="me-1" />{{ $t("addRegistry") }}
+                    </button>
+                </div>
+            </div>
         </div>
 
         <Confirm ref="confirmRemove" :yes-text="$t('yes')" :no-text="$t('no')" btn-style="btn-danger" @yes="doRemove">
@@ -180,6 +181,43 @@
 
 <script>
 import Confirm from "../Confirm.vue";
+
+/*
+ * Every source gets a colour, and the same source always gets the same colour,
+ * so a host is recognisable across the login list, the mirror list and the
+ * saved list without reading the text.
+ */
+const KNOWN_SOURCE_COLORS = {
+    "docker.io": "#1f8eed",
+    "ghcr.io": "#8250df",
+    "quay.io": "#e01f3d",
+    "gcr.io": "#4285f4",
+    "registry.gitlab.com": "#fc6d26",
+    "public.ecr.aws": "#f7941d",
+    "registry.k8s.io": "#326ce5",
+    "ghcr.kuma.pet": "#8250df",
+};
+
+const SOURCE_PALETTE = [
+    "#3b82f6",
+    "#a855f7",
+    "#ec4899",
+    "#f59e0b",
+    "#10b981",
+    "#06b6d4",
+    "#ef4444",
+    "#84cc16",
+];
+
+/** Strips scheme, port-less path and trailing slash: `https://a.io/v2/` -> `a.io` */
+export function sourceHost(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/^[a-z]+:\/\//, "")
+        .replace(/\/.*$/, "")
+        .replace(/^v1\./, "");
+}
 
 export default {
     components: {
@@ -241,6 +279,37 @@ export default {
     },
 
     methods: {
+        /** Stable colour for a registry host, so one source always looks the same */
+        sourceColor(value) {
+            const host = sourceHost(value);
+
+            if (KNOWN_SOURCE_COLORS[host]) {
+                return KNOWN_SOURCE_COLORS[host];
+            }
+
+            let hash = 0;
+            for (let i = 0; i < host.length; i++) {
+                hash = (hash * 31 + host.charCodeAt(i)) % 100000;
+            }
+            return SOURCE_PALETTE[hash % SOURCE_PALETTE.length];
+        },
+
+        sourceInitial(value) {
+            const host = sourceHost(value).replace(/^[^a-z0-9]+/, "");
+            return (host[0] || "?").toUpperCase();
+        },
+
+        /** Why this host shows up here: built in, saved in Dockcg, or from config.json */
+        loginSourceMeta(name) {
+            if (name === "docker.io") {
+                return `${this.$t("defaultRegistry")} · ${this.$t("defaultRegistryHint")}`;
+            }
+            if (this.managedLogin(name)) {
+                return this.$t("sourceManagedInDockcg");
+            }
+            return this.$t("sourceFromDockerConfig");
+        },
+
         /** A chip that maps to a registry saved in Dockcg can be removed here. */
         managedLogin(name) {
             return (this.sources.managedLogins || []).find((item) => item.label === name) || null;
@@ -415,151 +484,111 @@ export default {
     }
 }
 
-/* A label + values pair, with an optional explanation underneath */
-.source-item {
-    padding: 12px 0;
+/* Group heading, the way the stack list labels its sections */
+.src-group-title {
+    margin: 18px 0 2px;
+    padding: 0 8px;
+    color: #6c757d;
+    font-size: 12px;
+    font-weight: 600;
 
-    & + .source-item {
-        border-top: 1px solid #dee2e6;
+    .dark & {
+        color: rgba($dark-font-color, 0.55);
+    }
+}
+
+.saved-title {
+    margin-top: 0;
+}
+
+.src-list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Row geometry follows the stack list: 52px tall, 10px radius, hover fill */
+.src-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    transition: background-color ease-in-out 0.15s;
+
+    &:hover {
+        background-color: $highlight-white;
+    }
+
+    .dark &:hover {
+        background-color: $dark-bg2;
+    }
+
+    &.is-empty {
+        opacity: 0.75;
+    }
+}
+
+/* The colour block: same host, same colour, everywhere on the page */
+.src-mark {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+    text-transform: uppercase;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    user-select: none;
+
+    &.is-empty {
+        border: 1px dashed #ced4da;
+        background: transparent;
+        box-shadow: none;
+        color: #adb5bd;
+        font-size: 12px;
 
         .dark & {
             border-color: $dark-border-color;
+            color: rgba($dark-font-color, 0.5);
         }
     }
-
-    &:last-child {
-        padding-bottom: 0;
-    }
 }
 
-.source-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 12px;
-}
-
-.source-label {
-    flex: 0 0 auto;
-    width: 92px;
-    font-size: var(--rd-fs-small);
-    font-weight: 600;
-}
-
-.source-values {
+.src-body {
     display: flex;
     flex: 1 1 auto;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
     min-width: 0;
 }
 
-.source-note-body {
-    margin: 6px 0 0 104px;
+.src-name {
+    font-size: 14px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 
-/* Chips and the add button share one height so nothing overlaps */
-.source-chip {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 6px;
-    height: 26px;
-    padding: 0 9px;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    background: #f1f3f5;
-    color: inherit;
+.src-meta {
+    color: #6c757d;
     font-size: 12px;
-    line-height: 1;
-    white-space: nowrap;
+    line-height: 1.4;
     overflow-wrap: anywhere;
 
     .dark & {
-        border-color: $dark-border-color;
-        background: $dark-header-bg;
-        color: $dark-font-color;
+        color: rgba($dark-font-color, 0.55);
     }
 }
 
-.source-chip.is-empty {
-    border-style: dashed;
-    opacity: 0.6;
-}
-
-/* Docker Hub is built in: a badge instead of a remove button */
-.source-tag {
-    height: 17px;
-    padding: 0 6px;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.06);
-    font-size: 11px;
-    line-height: 17px;
-    opacity: 0.8;
-
-    .dark & {
-        background: rgba(255, 255, 255, 0.1);
-    }
-}
-
-.chip-remove {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: inherit;
-    font-size: 10px;
-    opacity: 0.5;
-    cursor: pointer;
-
-    &:hover {
-        background: rgba(0, 0, 0, 0.08);
-        opacity: 1;
-
-        .dark & {
-            background: rgba(255, 255, 255, 0.14);
-        }
-    }
-}
-
-/* Dashed affordance: reads as "add", never as a chip that is already filled */
-.source-add {
-    display: inline-flex;
+.src-actions {
+    display: flex;
     flex: 0 0 auto;
-    align-items: center;
-    gap: 5px;
-    height: 26px;
-    padding: 0 10px;
-    border: 1px dashed #ced4da;
-    border-radius: 6px;
-    background: transparent;
-    color: #495057;
-    font-size: 12px;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease;
-
-    &:hover {
-        border-color: $primary;
-        color: #2b7bb9;
-    }
-
-    .dark & {
-        border-color: rgba(255, 255, 255, 0.18);
-        color: rgba($dark-font-color, 0.9);
-
-        &:hover {
-            border-color: $primary;
-            color: $primary;
-        }
-    }
+    gap: 6px;
+    margin-left: auto;
 }
 
 .source-warn {
@@ -570,53 +599,5 @@ export default {
 
 .add-form {
     padding: 18px 20px;
-}
-
-/* ---- Registry list ---- */
-.registry-table {
-    margin-bottom: 0;
-
-    thead th {
-        padding: 8px 10px;
-        border-bottom: 1px solid #dee2e6;
-        color: #6c757d;
-        font-weight: 600;
-        white-space: nowrap;
-
-        .dark & {
-            border-bottom-color: $dark-border-color;
-            color: rgba($dark-font-color, 0.62);
-        }
-    }
-
-    tbody td {
-        padding: 8px 10px;
-        border-color: #e9ecef;
-
-        .dark & {
-            border-color: rgba($dark-border-color, 0.8);
-        }
-    }
-
-    tbody tr:last-child td {
-        border-bottom: 0;
-    }
-
-    code {
-        background: none;
-        padding: 0;
-        font-size: 12px;
-    }
-}
-
-.table-empty {
-    padding: 22px 10px !important;
-    border-bottom: 0 !important;
-    color: #6c757d;
-    text-align: center;
-
-    .dark & {
-        color: rgba($dark-font-color, 0.55);
-    }
 }
 </style>
