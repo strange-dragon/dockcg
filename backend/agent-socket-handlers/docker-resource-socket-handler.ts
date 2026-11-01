@@ -29,6 +29,7 @@ import {
 import { inspectImage } from "../docker-resource-actions";
 import { log } from "../log";
 import { createContainerComposeDraft } from "../container-compose-draft";
+import { adoptContainerToStack } from "../container-adoption";
 import { createHash } from "node:crypto";
 
 const REGISTRY_URL_REGEX = /^[A-Za-z0-9._\-:/]+$/;
@@ -77,6 +78,22 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
             try {
                 checkLogin(socket);
                 const result = await createContainerComposeDraft(requireString(id, "Container ID"));
+                callbackResult({ ok: true,
+                    ...result }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        // Hand a container that no compose file owns over to a stack: the file
+        // is written, the old container is stopped and replaced, and the stack
+        // is started. See backend/container-adoption.ts for the rollback.
+        agentSocket.on("adoptContainerToStack", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+                const data = payload as { id? : unknown, stackName? : unknown };
+                const result = await adoptContainerToStack(server, socket, data?.id, data?.stackName);
+                await server.sendStackList();
                 callbackResult({ ok: true,
                     ...result }, callback);
             } catch (e) {

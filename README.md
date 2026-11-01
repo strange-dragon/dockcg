@@ -16,7 +16,7 @@ A compose-first stack manager for Docker, forked from [Dockge](https://github.co
 
 New in this fork, on top of an otherwise unchanged compose workflow:
 
-- **Containers** — listed under the stack that owns them: expand a stack in the sidebar to see what it runs. Containers no compose file claims get their own group. Any container can be turned into a **Compose draft** (image, env, ports, mounts, restart policy, networks); the original is never stopped or deleted.
+- **Containers** — listed under the stack that owns them: expand a stack in the sidebar to see what it runs. Containers no compose file claims get their own group and can be **adopted into a stack** in one step: a `compose.yaml` is written into the stacks folder and Compose takes the container over. The dialog lists exactly what changes (manager, container name, image, ports, mounts, networks, env, restart policy) and previews the file; if the deploy fails the original container is started again.
 - **Images** — in-use / unused / dangling state, containers using each image, all tags of the same ID, digest, platform, targeted delete, previewed prune.
 - **Volumes** — mountpoint, owning stack + service, orphan cleanup, disk usage on demand.
 - **Networks** — inventory plus a relationship view: drag a service onto a network and its `compose.yaml` is edited for you (previewed, hash-guarded). Merge networks the same way. Unmanaged containers get an `external: true` snippet.

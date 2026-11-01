@@ -25,8 +25,7 @@
                     <font-awesome-icon icon="search" class="search-icon" />
                     <input
                         ref="searchInput" v-model="search" class="form-control search-input" type="search"
-                        :placeholder="compact ? $t('search') : searchPlaceholder" autocomplete="off"
-                        @blur="onSearchBlur" @keydown.esc="closeSearch"
+                        autocomplete="off" @blur="onSearchBlur" @keydown.esc="closeSearch"
                     />
                     <button class="search-clear" type="button" :title="$t('cancel')" @mousedown.prevent="closeSearch">
                         <font-awesome-icon icon="times" />
@@ -196,13 +195,6 @@ export default {
     },
 
     computed: {
-        searchPlaceholder() {
-            if (this.view === "stacks") {
-                return `${this.$t("search")} — ${this.$t("stacks")} / ${this.$t("containers")}`;
-            }
-            return this.$t("search");
-        },
-
         hasMultipleEndpoints() {
             return Object.keys(this.$root.agentList || {}).length > 1;
         },
@@ -473,8 +465,13 @@ export default {
         },
 
         openContainer(container) {
-            this.$router.push({ path: "/resources/containers",
-                query: { name: container.id } });
+            // A container that already belongs to a stack lives on its stack
+            // page; the migration page is only for containers Compose does not own.
+            if (container.stack) {
+                this.$router.push(this.endpoint ? `/compose/${container.stack}/${this.endpoint}` : `/compose/${container.stack}`);
+                return;
+            }
+            this.$router.push("/resources/containers");
         },
 
         openRow(row) {

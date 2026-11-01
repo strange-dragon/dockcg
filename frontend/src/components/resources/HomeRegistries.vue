@@ -26,7 +26,7 @@
                 <h3>{{ $t("dockerRegistryMirrors") }}</h3>
                 <div class="source-values">
                     <code v-for="mirror in sources.mirrors" :key="mirror">{{ mirror }}</code>
-                    <span v-if="sources.mirrors.length === 0" class="text-muted">{{ $t("noneConfigured") }}</span>
+                    <span v-if="sources.mirrors.length === 0 && !sources.daemonError" class="text-muted">{{ $t("noneConfigured") }}</span>
                 </div>
             </div>
         </div>

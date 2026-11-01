@@ -41,11 +41,11 @@
                 </div>
                 <div class="source-group small">
                     <strong>{{ $t("dockerRegistryMirrors") }}</strong>
-                    <span v-if="sources.mirrors.length === 0" class="text-muted">{{ $t("noDockerRegistryMirrors") }}</span>
+                    <span v-if="sources.mirrors.length === 0 && !sources.daemonError" class="text-muted">{{ $t("noDockerRegistryMirrors") }}</span>
                     <code v-for="mirror in sources.mirrors" :key="mirror" class="source-chip">{{ mirror }}</code>
                 </div>
                 <p v-if="sources.configError" class="text-warning small mb-0">{{ $t("dockerConfigReadFailed") }}</p>
-                <p v-if="sources.daemonError" class="text-warning small mb-0">{{ $t("dockerMirrorReadFailed") }} {{ sources.daemonError }}</p>
+                <p v-if="sources.daemonError" class="text-warning small mb-0">{{ $t("dockerMirrorReadFailed") }}</p>
             </template>
         </section>
 

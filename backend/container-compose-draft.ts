@@ -18,8 +18,21 @@ interface InspectedContainer {
     NetworkSettings? : { Networks? : Record<string, unknown> };
 }
 
+/** Snapshot of the running container, used to show what the migration changes. */
+export interface ContainerDraftSummary {
+    name : string;
+    service : string;
+    image : string;
+    state : string;
+    ports : string[];
+    mounts : string[];
+    networks : string[];
+    envCount : number;
+    restart : string;
+}
+
 /** A read-only conversion. The resulting text must be reviewed before Compose deployment. */
-export async function createContainerComposeDraft(containerId : string) : Promise<{ composeYAML : string, warnings : string[] }> {
+export async function createContainerComposeDraft(containerId : string) : Promise<{ composeYAML : string, warnings : string[], summary : ContainerDraftSummary }> {
     if (!/^[a-f0-9]{12,64}$/.test(containerId)) {
         throw new Error("Invalid container ID");
     }
@@ -40,6 +53,7 @@ export async function createContainerComposeDraft(containerId : string) : Promis
     const key = name.replace(/[^A-Za-z0-9_-]/g, "_").replace(/^[^A-Za-z]+/, "service_");
     const service : Record<string, unknown> = { image: source.Config.Image };
     const warnings : string[] = [];
+    const summaryMounts : string[] = [];
     if (matching[0].stack) {
         warnings.push("migrationAlreadyCompose");
     }
@@ -54,9 +68,11 @@ export async function createContainerComposeDraft(containerId : string) : Promis
         service.user = source.Config.User;
     }
     const restart = source.HostConfig?.RestartPolicy;
-    if (restart?.Name && restart.Name !== "no") {
-        service.restart = restart.Name === "on-failure" && restart.MaximumRetryCount
-            ? `on-failure:${restart.MaximumRetryCount}` : restart.Name;
+    const restartPolicy = restart?.Name && restart.Name !== "no"
+        ? (restart.Name === "on-failure" && restart.MaximumRetryCount ? `on-failure:${restart.MaximumRetryCount}` : restart.Name)
+        : "";
+    if (restartPolicy) {
+        service.restart = restartPolicy;
     }
     const portBindings = source.HostConfig?.PortBindings || {};
     const ports : string[] = [];
@@ -86,8 +102,10 @@ export async function createContainerComposeDraft(containerId : string) : Promis
             volumes[alias] = { external: true,
                 name: mount.Name };
             mounts.push(`${alias}:${mount.Destination}${option}`);
+            summaryMounts.push(`${mount.Name} → ${mount.Destination}${option}`);
         } else if (mount.Type === "bind" && mount.Source) {
             mounts.push(`${mount.Source}:${mount.Destination}${option}`);
+            summaryMounts.push(`${mount.Source} → ${mount.Destination}${option}`);
         } else {
             warnings.push("migrationMountWarning");
         }
@@ -97,13 +115,17 @@ export async function createContainerComposeDraft(containerId : string) : Promis
     }
     const mode = source.HostConfig?.NetworkMode || "";
     const networks : Record<string, unknown> = {};
+    let summaryNetworks : string[] = [];
     if ([ "host", "none" ].includes(mode)) {
         service.network_mode = mode;
+        summaryNetworks = [ mode ];
     } else if (mode.startsWith("container:")) {
         service.network_mode = mode;
+        summaryNetworks = [ mode ];
         warnings.push("migrationNetworkModeWarning");
     } else {
         const names = Object.keys(source.NetworkSettings?.Networks || {}).filter((item) => item !== "bridge");
+        summaryNetworks = names;
         for (const networkName of names) {
             const alias = `network_${Object.keys(networks).length + 1}`;
             networks[alias] = { external: true,
@@ -124,6 +146,19 @@ export async function createContainerComposeDraft(containerId : string) : Promis
     if (Object.keys(networks).length) {
         compose.networks = networks;
     }
-    return { composeYAML: yaml.stringify(compose),
-        warnings };
+    return {
+        composeYAML: yaml.stringify(compose),
+        warnings,
+        summary: {
+            name,
+            service: key,
+            image: source.Config.Image,
+            state: matching[0].state,
+            ports,
+            mounts: summaryMounts,
+            networks: summaryNetworks,
+            envCount: source.Config.Env?.length || 0,
+            restart: restartPolicy,
+        },
+    };
 }
