@@ -38,7 +38,7 @@
             <section v-for="group in groups" :key="group.type" class="shadow-box overview-card">
                 <div class="card-heading">
                     <div>
-                        <h2>{{ $t(group.title) }}</h2>
+                        <h2 class="h5">{{ $t(group.title) }}</h2>
                         <span class="card-count">{{ group.count }}</span>
                     </div>
                     <router-link :to="`/resources/${group.type}`">{{ $t("viewAll") }} →</router-link>
@@ -206,7 +206,7 @@ export default {
     align-items: flex-start;
     margin-bottom: var(--rd-5);
 
-    h1 { font-size: var(--rd-fs-title); margin: 0 0 6px; line-height: 1.3; }
+    h1 { margin: 0 0 6px; line-height: 1.3; }
     p { color: var(--muted); margin: 0; font-size: var(--rd-fs-small); }
 }
 
@@ -218,14 +218,13 @@ export default {
 
 .overview-card { padding: var(--rd-4); min-width: 0; }
 .card-heading { margin-bottom: var(--rd-3); }
-.card-heading h2 { display: inline; font-size: var(--rd-fs-section); margin: 0; }
+.card-heading h2 { display: inline; margin: 0; }
 .card-heading a { font-size: var(--rd-fs-small); white-space: nowrap; }
 .card-count { margin-left: var(--rd-2); color: var(--muted); font-size: var(--rd-fs-small); }
 .overview-item {
     padding: var(--rd-2) 0;
     border-top: 1px solid var(--card-border);
     text-decoration: none;
-    font-size: var(--rd-fs-body);
 }
 .item-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .overview-item .badge { flex: 0 0 auto; }
