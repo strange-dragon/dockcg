@@ -77,7 +77,7 @@
                     <div class="src-group-title">{{ $t("dockerRegistryMirrors") }}</div>
                     <div class="src-list">
                         <div v-for="mirror in sources.mirrors" :key="mirror" class="src-item">
-                            <span class="src-mark" :style="{ background: sourceColor(mirror) }">
+                            <span class="src-mark is-mirror" :style="{ background: mirrorMarkColor }">
                                 <font-awesome-icon v-if="sourceIcon(mirror)" :icon="['fab', sourceIcon(mirror)]" />
                                 <template v-else>{{ sourceInitial(mirror) }}</template>
                             </span>
@@ -216,6 +216,13 @@ const SOURCE_PALETTE = [
 ];
 
 /*
+ * Mirrors are one kind of thing, not many hosts: they all take the green the
+ * stack list uses for its active row (`#cdf8f4`, see StackListItem.vue), so the
+ * eye reads "these are pull-through caches" before it reads a single domain.
+ */
+const MIRROR_MARK_COLOR = "#cdf8f4";
+
+/*
  * Brand mark for well-known registries; anything else falls back to the first
  * letter of its host, so an unknown registry still gets a recognisable block.
  */
@@ -261,6 +268,7 @@ export default {
                 configPath: "",
                 credsStore: "" },
             selectedEndpoint: this.$route.query.endpoint || this.endpoint,
+            mirrorMarkColor: MIRROR_MARK_COLOR,
             loadError: "",
             requestId: 0,
             loading: false,
@@ -283,6 +291,46 @@ export default {
         hasMultipleEndpoints() {
             return Object.keys(this.$root.agentList || {}).length > 1;
         },
+
+        /**
+         * Colour per host, handed out in the order the sources appear on screen.
+         * Hashing a host into a palette lets two unrelated registries land on the
+         * same swatch, and that swatch is the only thing telling them apart.
+         * Brands keep their own colour; everything else takes the next free one.
+         * Mirrors are not in here: they share one green, see MIRROR_MARK_COLOR.
+         */
+        sourceColors() {
+            const colors = {};
+            const taken = new Set(Object.values(KNOWN_SOURCE_COLORS));
+            let cursor = 0;
+
+            const assign = (value) => {
+                const host = sourceHost(value);
+
+                if (!host || colors[host]) {
+                    return;
+                }
+                if (KNOWN_SOURCE_COLORS[host]) {
+                    colors[host] = KNOWN_SOURCE_COLORS[host];
+                    return;
+                }
+                for (let step = 0; step < SOURCE_PALETTE.length; step++) {
+                    const candidate = SOURCE_PALETTE[(cursor + step) % SOURCE_PALETTE.length];
+                    if (!taken.has(candidate)) {
+                        colors[host] = candidate;
+                        taken.add(candidate);
+                        cursor = (cursor + step + 1) % SOURCE_PALETTE.length;
+                        return;
+                    }
+                }
+                colors[host] = SOURCE_PALETTE[cursor];
+            };
+
+            (this.sources.loginRegistries || []).forEach(assign);
+            (this.registries || []).forEach(registry => assign(registry.url || registry.name));
+
+            return colors;
+        },
     },
 
     watch: {
@@ -298,19 +346,10 @@ export default {
     },
 
     methods: {
-        /** Stable colour for a registry host, so one source always looks the same */
+        /** Colour for a registry host, so one source always looks the same */
         sourceColor(value) {
             const host = sourceHost(value);
-
-            if (KNOWN_SOURCE_COLORS[host]) {
-                return KNOWN_SOURCE_COLORS[host];
-            }
-
-            let hash = 0;
-            for (let i = 0; i < host.length; i++) {
-                hash = (hash * 31 + host.charCodeAt(i)) % 100000;
-            }
-            return SOURCE_PALETTE[hash % SOURCE_PALETTE.length];
+            return this.sourceColors[host] || KNOWN_SOURCE_COLORS[host] || SOURCE_PALETTE[0];
         },
 
         sourceInitial(value) {
@@ -608,6 +647,12 @@ export default {
             border-color: $dark-border-color;
             color: rgba($dark-font-color, 0.5);
         }
+    }
+
+    /* Pale green needs dark ink on top of it, unlike the brand swatches */
+    &.is-mirror {
+        color: #10403a;
+        box-shadow: inset 0 0 0 1px rgba(16, 64, 58, 0.12);
     }
 }
 
