@@ -670,11 +670,21 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                     throw new ValidationError("Registry not found");
                 }
 
-                // Best effort: drop the stored docker credential as well
-                const logoutRes = await dockerExec([ "logout", bean.url ]);
+                // `docker logout` is host-wide, so only drop the credential when no
+                // other entry still points at the same registry. Otherwise deleting one
+                // row would silently log the host out for every other credential,
+                // including ones created outside Dockcg.
+                const sharedWith = (await Registry.getRegistryList())
+                    .filter((item) => Number(item.id) !== Number(bean.id) && item.url === bean.url);
 
-                if (logoutRes.exitCode !== 0) {
-                    log.warn("registry", `docker logout ${bean.url} failed: ${logoutRes.stderr}`);
+                if (sharedWith.length === 0) {
+                    const logoutRes = await dockerExec([ "logout", bean.url ]);
+
+                    if (logoutRes.exitCode !== 0) {
+                        log.warn("registry", `docker logout ${bean.url} failed: ${logoutRes.stderr}`);
+                    }
+                } else {
+                    log.info("registry", `keep docker credential for ${bean.url}: still used by ${sharedWith.length} other entr${sharedWith.length === 1 ? "y" : "ies"}`);
                 }
 
                 await R.trash(bean);

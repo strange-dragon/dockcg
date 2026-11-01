@@ -15,8 +15,12 @@ RUN CGO_ENABLED=0 go build -o ./extra/healthcheck ./extra/healthcheck.go
 #
 # Everything this project needs is installed here, so the image no longer
 # depends on a prebuilt third-party base image from a Docker Hub namespace.
+#
+# DOCKER_APT_BASE can be pointed at a mirror when download.docker.com is slow,
+# e.g. --build-arg DOCKER_APT_BASE=https://mirrors.aliyun.com/docker-ce/linux/debian
 ############################################
 FROM node:22-bookworm-slim AS base
+ARG DOCKER_APT_BASE=https://download.docker.com/linux/debian
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -25,10 +29,10 @@ RUN apt-get update \
         gnupg \
         unzip \
     && install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg \
+    && curl -fsSL "${DOCKER_APT_BASE}/gpg" \
         | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
     && chmod a+r /etc/apt/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] ${DOCKER_APT_BASE} $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         > /etc/apt/sources.list.d/docker.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -47,6 +51,23 @@ COPY --chown=node:node ./package-lock.json ./package-lock.json
 RUN npm ci --omit=dev
 
 ############################################
+# Frontend assets
+#
+# vite lives in devDependencies, so this stage needs the full dependency tree.
+# Keeping it separate means the runtime image still ships production deps only,
+# and `docker build` no longer depends on a frontend-dist prepared on the host.
+############################################
+FROM base AS build_frontend
+WORKDIR /app
+COPY --chown=node:node ./package.json ./package.json
+COPY --chown=node:node ./package-lock.json ./package-lock.json
+RUN npm ci --no-fund
+COPY --chown=node:node ./tsconfig.json ./tsconfig.json
+COPY --chown=node:node ./common ./common
+COPY --chown=node:node ./frontend ./frontend
+RUN npm run build:frontend
+
+############################################
 # ⭐ Main image
 ############################################
 FROM base AS release
@@ -54,6 +75,7 @@ WORKDIR /app
 COPY --chown=node:node --from=build_healthcheck /app/extra/healthcheck /app/extra/healthcheck
 COPY --from=build /app/node_modules /app/node_modules
 COPY --chown=node:node . .
+COPY --chown=node:node --from=build_frontend /app/frontend-dist ./frontend-dist
 RUN mkdir ./data
 
 # It is just for safe, as by default, it is disabled in the latest Node.js now.

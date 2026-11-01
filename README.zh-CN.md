@@ -41,7 +41,9 @@
 - Linux：Ubuntu、Debian/Raspbian Bullseye 及以上、CentOS、Fedora、Arch。不支持 Windows
 - `amd64`、`arm64` 或 `armv7`
 
-> 镜像**尚未发布**。仓库里的 `compose.yaml` 带 `build:` 段，首次启动会在本地构建。
+> 镜像发布在 GitHub 容器仓库：`ghcr.io/strange-dragon/dockcg` —— `latest`（打标签的正式版）、`nightly` 与 `edge`（master 每次提交）、以及版本号标签。
+>
+> 如果 `docker pull` 报 `denied` / `unauthorized`，说明**包**还是私有的。Git 仓库公开和容器包公开是两个独立开关：到 GitHub 的包设置里把可见性改成 **Public**，之后任何人不登录都能拉。
 
 ### 快速开始
 
@@ -50,21 +52,21 @@ mkdir -p /opt/stacks /opt/dockcg
 cd /opt/dockcg
 
 curl https://raw.githubusercontent.com/strange-dragon/dockcg/master/compose.yaml --output compose.yaml
-docker compose up -d --build
+docker compose up -d
 ```
 
-打开 <http://localhost:5001>，创建管理员账号。
+打开 <http://localhost:5001>，创建管理员账号。不用构建、不用登录，镜像几秒拉完。
 
 ### compose.yaml
 
 ```yaml
 services:
   dockcg:
-    image: strange-dragon/dockcg:1
-    build:                      # 发布自己的镜像后可删除
-      context: .
-      dockerfile: docker/Dockerfile
-      target: release
+    image: ghcr.io/strange-dragon/dockcg:latest
+    # build:                    # 想从源码构建就取消注释
+    #   context: .
+    #   dockerfile: docker/Dockerfile
+    #   target: release
     restart: unless-stopped
     ports:
       - 5001:5001
@@ -98,7 +100,7 @@ services:
 ### 升级与备份
 
 ```bash
-git pull && docker compose build && docker compose up -d    # 升级
+docker compose pull && docker compose up -d                 # 升级（也可指定版本号标签）
 
 docker compose stop                                         # 备份
 tar czf dockcg-backup-$(date +%F).tar.gz data /opt/stacks
@@ -117,11 +119,18 @@ mv /opt/dockcg/data/dockge.db /opt/dockcg/data/dockcg.db
 ### 从源码构建
 
 ```bash
-npm ci && npm run build:frontend
-docker build -f docker/Dockerfile --target release -t strange-dragon/dockcg:1 .
+docker build -f docker/Dockerfile --target release -t ghcr.io/strange-dragon/dockcg:dev .
 ```
 
-`docker/Dockerfile` 自包含：`golang` 阶段编译健康检查，`node:22-bookworm-slim` 阶段装 `docker-ce-cli`、`compose-plugin`、`dumb-init`、`tsx` 再构建前端。不从上游 Docker Hub 命名空间拉任何东西。
+`docker/Dockerfile` 自包含，宿主机不需要先跑 `npm`：`golang` 阶段编译健康检查，`node:22-bookworm-slim` 阶段装 `docker-ce-cli`、`compose-plugin`、`dumb-init`、`tsx`，`build_frontend` 阶段用 devDependencies 跑 `vite build`，运行时阶段只拿生产依赖和 `frontend-dist`。不从任何第三方 Docker Hub 命名空间拉东西。
+
+`download.docker.com` 慢的时候可以让 Docker 的 apt 源走国内镜像：
+
+```bash
+docker build -f docker/Dockerfile --target release \
+  --build-arg DOCKER_APT_BASE=https://mirrors.aliyun.com/docker-ce/linux/debian \
+  -t ghcr.io/strange-dragon/dockcg:dev .
+```
 
 ---
 

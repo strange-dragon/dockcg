@@ -57,8 +57,8 @@ jobs:
       - name: Check TypeScript
         run: npm run check-ts
 
-      # 镜像里的 frontend-dist 是构建产物，Dockerfile 直接 COPY . 进去，
-      # 所以必须先构建前端（等同 npm run release-final 的顺序）
+      # 镜像里的 frontend-dist 由 Dockerfile 的 build_frontend 阶段产出；
+      # 这里仍单独构建一次，是为了下面的产物断言和 e2e 测试能直接读到文件
       - name: Build frontend
         run: npm run build:frontend
 

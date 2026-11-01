@@ -41,7 +41,9 @@ Everything else — stack management, the editor, the terminal, agent setup, sta
 - Linux: Ubuntu, Debian/Raspbian Bullseye+, CentOS, Fedora, Arch. Windows is not supported
 - `amd64`, `arm64` or `armv7`
 
-> The image is **not published yet**. `compose.yaml` carries a `build:` section, so the first start compiles it locally.
+> Images live on GitHub Container Registry: `ghcr.io/strange-dragon/dockcg` — `latest` (tagged releases), `nightly` and `edge` (every push to master), plus version tags.
+>
+> If `docker pull` answers `denied` or `unauthorized`, the **package** is still private. Git repository visibility and package visibility are two separate switches: open the package settings on GitHub and set visibility to **Public**. After that no `docker login` is needed, for anyone.
 
 ### Quick start
 
@@ -50,21 +52,21 @@ mkdir -p /opt/stacks /opt/dockcg
 cd /opt/dockcg
 
 curl https://raw.githubusercontent.com/strange-dragon/dockcg/master/compose.yaml --output compose.yaml
-docker compose up -d --build
+docker compose up -d
 ```
 
-Open <http://localhost:5001> and create the admin account.
+Open <http://localhost:5001> and create the admin account. No build step, no login — the image is pulled in a few seconds.
 
 ### compose.yaml
 
 ```yaml
 services:
   dockcg:
-    image: strange-dragon/dockcg:1
-    build:                      # remove once you publish your own image
-      context: .
-      dockerfile: docker/Dockerfile
-      target: release
+    image: ghcr.io/strange-dragon/dockcg:latest
+    # build:                    # build from source instead of pulling
+    #   context: .
+    #   dockerfile: docker/Dockerfile
+    #   target: release
     restart: unless-stopped
     ports:
       - 5001:5001
@@ -98,7 +100,7 @@ Reverse proxy setups (Caddy / nginx / Traefik, websocket included) are in [docs/
 ### Upgrade and backup
 
 ```bash
-git pull && docker compose build && docker compose up -d    # upgrade
+docker compose pull && docker compose up -d                 # upgrade (or use a version tag)
 
 docker compose stop                                         # backup
 tar czf dockcg-backup-$(date +%F).tar.gz data /opt/stacks
@@ -117,11 +119,18 @@ Then rename `DOCKGE_STACKS_DIR` → `DOCKCG_STACKS_DIR` in your compose file, ke
 ### Build from source
 
 ```bash
-npm ci && npm run build:frontend
-docker build -f docker/Dockerfile --target release -t strange-dragon/dockcg:1 .
+docker build -f docker/Dockerfile --target release -t ghcr.io/strange-dragon/dockcg:dev .
 ```
 
-`docker/Dockerfile` is self-contained: a `golang` stage compiles the healthcheck, a `node:22-bookworm-slim` stage installs `docker-ce-cli`, `compose-plugin`, `dumb-init` and `tsx`, then builds the frontend. Nothing is pulled from the upstream Docker Hub namespace.
+`docker/Dockerfile` is self-contained — no host-side `npm` run is required. A `golang` stage compiles the healthcheck, a `node:22-bookworm-slim` stage installs `docker-ce-cli`, `compose-plugin`, `dumb-init` and `tsx`, a `build_frontend` stage runs `vite build` with dev dependencies, and the runtime stage receives only production `node_modules` plus `frontend-dist`. Nothing is pulled from a third-party Docker Hub namespace.
+
+When `download.docker.com` is slow, point the Docker apt repo at a mirror:
+
+```bash
+docker build -f docker/Dockerfile --target release \
+  --build-arg DOCKER_APT_BASE=https://mirrors.aliyun.com/docker-ce/linux/debian \
+  -t ghcr.io/strange-dragon/dockcg:dev .
+```
 
 ---
 

@@ -1,11 +1,17 @@
 services:
   dockcg:
-    image: strange-dragon/dockcg:1
-    # Not published yet - build locally with: docker compose up -d --build
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: release
+    # Pulled from GitHub Container Registry.
+    #   latest  = tagged release (v*)
+    #   nightly = every push to master
+    image: ghcr.io/strange-dragon/dockcg:latest
+
+    # Build from source instead of pulling the image. `docker compose up -d --build`
+    # also works without uncommenting this block.
+    # build:
+    #   context: .
+    #   dockerfile: docker/Dockerfile
+    #   target: release
+
     restart: unless-stopped
     ports:
       # Host Port : Container Port
@@ -13,7 +19,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
-        
+
       # If you want to use private registries, you need to share the auth file with Dockcg:
       # - /root/.docker/:/root/.docker
 
