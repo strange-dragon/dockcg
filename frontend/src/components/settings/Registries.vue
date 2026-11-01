@@ -72,26 +72,22 @@
                     </div>
                 </div>
 
-                <div class="src-group-title">{{ $t("dockerRegistryMirrors") }}</div>
-                <div class="src-list">
-                    <div v-for="mirror in sources.mirrors" :key="mirror" class="src-item">
-                        <span class="src-mark" :style="{ background: sourceColor(mirror) }">
-                            <font-awesome-icon v-if="sourceIcon(mirror)" :icon="['fab', sourceIcon(mirror)]" />
-                            <template v-else>{{ sourceInitial(mirror) }}</template>
-                        </span>
-                        <div class="src-body">
-                            <span class="src-name">{{ mirror }}</span>
-                            <span class="src-meta">{{ $t("sourceDaemonMirror") }}</span>
+                <!-- Mirrors only make sense as a group once the daemon has some -->
+                <template v-if="sources.mirrors.length > 0">
+                    <div class="src-group-title">{{ $t("dockerRegistryMirrors") }}</div>
+                    <div class="src-list">
+                        <div v-for="mirror in sources.mirrors" :key="mirror" class="src-item">
+                            <span class="src-mark" :style="{ background: sourceColor(mirror) }">
+                                <font-awesome-icon v-if="sourceIcon(mirror)" :icon="['fab', sourceIcon(mirror)]" />
+                                <template v-else>{{ sourceInitial(mirror) }}</template>
+                            </span>
+                            <div class="src-body">
+                                <span class="src-name">{{ mirror }}</span>
+                                <span class="src-meta">{{ $t("sourceDaemonMirror") }}</span>
+                            </div>
                         </div>
                     </div>
-                    <div v-if="sources.mirrors.length === 0 && !sources.daemonError" class="src-item is-empty">
-                        <span class="src-mark is-empty"><font-awesome-icon icon="circle-info" /></span>
-                        <div class="src-body">
-                            <span class="src-name">{{ $t("noneConfigured") }}</span>
-                            <span class="src-meta">{{ $t("mirrorConfigureInDaemon") }}</span>
-                        </div>
-                    </div>
-                </div>
+                </template>
 
                 <p v-if="sources.configError" class="source-warn mb-0">{{ $t("dockerConfigReadFailed") }}</p>
                 <p v-if="sources.daemonError" class="source-warn mb-0">{{ $t("dockerMirrorReadFailed") }}</p>
