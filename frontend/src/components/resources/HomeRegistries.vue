@@ -1,7 +1,7 @@
 <template>
     <section class="shadow-box big-padding home-registries">
         <div class="section-heading">
-            <h2>{{ $t("registries") }}</h2>
+            <h2 class="h5">{{ $t("registries") }}</h2>
             <router-link class="btn btn-normal btn-sm" :to="{ path: '/settings/registries', query: { endpoint } }">{{ $t("manageRegistries") }}</router-link>
         </div>
 
@@ -107,7 +107,6 @@ export default {
 
 .section-heading h2 {
     margin: 0;
-    font-size: 1.5rem;
 }
 
 .source-group {
@@ -142,7 +141,7 @@ export default {
 
 .source-group h3 {
     margin: 0 0 10px;
-    font-size: 0.875rem;
+    font-size: var(--rd-fs-small);
     font-weight: 600;
     color: #6c757d;
 
@@ -155,7 +154,7 @@ export default {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 0.875rem;
+    font-size: var(--rd-fs-small);
 }
 
 .source-values code {
