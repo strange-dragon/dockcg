@@ -421,6 +421,10 @@
     "defaultRegistryHint": "Docker Hub is the built-in registry and cannot be removed",
     "removeSource": "Remove",
     "sourceFromDockerConfig": "Comes from the Docker config (config.json) and cannot be removed here",
-    "sourceManagedInDockcg": "Saved in Dockcg, edit it below",
-    "sourceDaemonMirror": "From the Docker daemon, edit daemon.json"
+    "sourceManagedInDockcg": "Managed in Dockcg",
+    "sourceDaemonMirror": "From the Docker daemon",
+    "configuredSourcesTooltip": "Login names come from the Docker config inside the container, mirrors from the Docker daemon. Only names are shown, never credentials. A config entry only means the name was saved; it does not prove the login still works.",
+    "sourceConfigOnly": "config.json only",
+    "mirrorConfigureInDaemon": "Set registry-mirrors in daemon.json",
+    "sourceFromHostConfig": "Mount /root/.docker or add a registry"
 }

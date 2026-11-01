@@ -28,9 +28,10 @@
         <p class="page-hint small">{{ $t("registriesHint") }}</p>
 
         <section class="shadow-box configured-sources mb-4">
-            <h2 class="h5">{{ $t("configuredDockerSources") }}</h2>
-            <p class="source-note">{{ $t("configuredDockerSourcesHint") }}</p>
-            <p class="source-note">{{ $t("configuredSourceUnverified") }}</p>
+            <h2 class="h5">
+                {{ $t("configuredDockerSources") }}
+                <font-awesome-icon icon="circle-info" class="src-info" :title="$t('configuredSourcesTooltip')" />
+            </h2>
             <div v-if="loading" class="source-note" role="status">{{ $t("loadingResources") }}</div>
             <div v-else-if="loadError" class="text-danger">{{ loadError }}</div>
             <template v-else>
@@ -38,7 +39,7 @@
                 <div class="src-list">
                     <div
                         v-for="name in sources.loginRegistries" :key="name" class="src-item"
-                        :title="name === 'docker.io' ? $t('defaultRegistryHint') : (managedLogin(name) ? '' : $t('sourceFromDockerConfig'))"
+                        :title="loginSourceTitle(name)"
                     >
                         <span class="src-mark" :style="{ background: sourceColor(name) }">{{ sourceInitial(name) }}</span>
                         <div class="src-body">
@@ -58,7 +59,7 @@
                         <span class="src-mark is-empty"><font-awesome-icon icon="plus" /></span>
                         <div class="src-body">
                             <span class="src-name">{{ $t("noneConfigured") }}</span>
-                            <span class="src-meta">{{ $t("noDockerLoginSources") }}</span>
+                            <span class="src-meta">{{ $t("sourceFromHostConfig") }}</span>
                         </div>
                         <div class="src-actions">
                             <button class="btn btn-sm btn-normal" type="button" @click="showForm = true">
@@ -81,7 +82,7 @@
                         <span class="src-mark is-empty"><font-awesome-icon icon="circle-info" /></span>
                         <div class="src-body">
                             <span class="src-name">{{ $t("noneConfigured") }}</span>
-                            <span class="src-meta">{{ $t("noDockerRegistryMirrors") }}</span>
+                            <span class="src-meta">{{ $t("mirrorConfigureInDaemon") }}</span>
                         </div>
                     </div>
                 </div>
@@ -302,12 +303,19 @@ export default {
         /** Why this host shows up here: built in, saved in Dockcg, or from config.json */
         loginSourceMeta(name) {
             if (name === "docker.io") {
-                return `${this.$t("defaultRegistry")} · ${this.$t("defaultRegistryHint")}`;
+                return this.$t("defaultRegistry");
             }
             if (this.managedLogin(name)) {
                 return this.$t("sourceManagedInDockcg");
             }
-            return this.$t("sourceFromDockerConfig");
+            return this.$t("sourceConfigOnly");
+        },
+
+        loginSourceTitle(name) {
+            if (name === "docker.io") {
+                return this.$t("defaultRegistryHint");
+            }
+            return this.managedLogin(name) ? "" : this.$t("sourceFromDockerConfig");
         },
 
         /** A chip that maps to a registry saved in Dockcg can be removed here. */
@@ -469,7 +477,25 @@ export default {
     padding: 16px 18px;
 
     h2 {
-        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 2px;
+    }
+}
+
+/* The long explanation lives in this tooltip instead of a paragraph */
+.src-info {
+    color: #adb5bd;
+    font-size: 12px;
+    cursor: help;
+
+    .dark & {
+        color: rgba($dark-font-color, 0.45);
+    }
+
+    &:hover {
+        color: $primary;
     }
 }
 
