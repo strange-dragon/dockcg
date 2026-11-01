@@ -2,18 +2,18 @@
     <div class="resource-detail">
         <template v-if="network">
             <div class="detail-head">
-                <span class="badge badge-lg" :class="stateClass">{{ $t(stateLabel) }}</span>
+                <span class="badge" :class="stateClass">{{ $t(stateLabel) }}</span>
                 <h1 class="detail-title">{{ network.name }}</h1>
             </div>
 
             <div class="actions">
-                <button class="btn btn-dark" :disabled="busy || mergeCandidates.length === 0" @click="showMerge = true">
+                <button class="btn btn-normal" :disabled="busy || mergeCandidates.length === 0" @click="showMerge = true">
                     <font-awesome-icon icon="code-branch" /> {{ $t("mergeNetworks") }}
                 </button>
                 <button class="btn btn-primary" :disabled="busy" @click="showSnippet = true">
                     <font-awesome-icon icon="share-nodes" /> {{ $t("shareAcrossStacks") }}
                 </button>
-                <button class="btn btn-dark" :disabled="busy" @click="load">
+                <button class="btn btn-normal" :disabled="busy" @click="load">
                     <font-awesome-icon icon="arrows-rotate" :spin="busy" /> {{ $t("refresh") }}
                 </button>
                 <button class="btn btn-danger" :disabled="network.used || network.builtIn || !!network.stack || busy" :title="deleteTitle" @click="$refs.confirm.show()">
@@ -26,7 +26,7 @@
                 <h2 class="section-title">{{ $t("networkRelations") }}</h2>
                 <p class="note">{{ $t("networkRelationHint") }}</p>
                 <div class="relation-grid">
-                    <div class="card relation-panel">
+                    <div class="shadow-box relation-panel">
                         <h3>{{ $t("availableContainers") }}</h3>
                         <p class="relation-help">{{ $t("dragContainerHint") }}</p>
                         <div v-if="availableContainers.length === 0" class="relation-empty">{{ $t("noAvailableContainers") }}</div>
@@ -38,7 +38,7 @@
                             </button>
                         </div>
                     </div>
-                    <div class="card relation-panel relation-target" :class="{ 'drag-over': dragOver && !network.builtIn }" @dragover.prevent="onDragOver" @dragleave="dragOver = false" @drop.prevent="onDrop">
+                    <div class="shadow-box relation-panel relation-target" :class="{ 'drag-over': dragOver && !network.builtIn }" @dragover.prevent="onDragOver" @dragleave="dragOver = false" @drop.prevent="onDrop">
                         <h3>{{ network.name }}</h3>
                         <p class="relation-help">{{ $t(network.builtIn ? "builtInNetworkMsg" : "dropContainerHint") }}</p>
                         <div v-if="network.containers.length === 0" class="relation-empty">{{ $t("noContainerUsesNetwork") }}</div>
@@ -58,7 +58,7 @@
                 <div class="col">
                     <section>
                         <h2 class="section-title">{{ $t("connectedContainers") }}</h2>
-                        <div class="card">
+                        <div class="shadow-box">
                             <div v-for="container in network.containers" :key="container.id" class="crow">
                                 <div class="crow-main">
                                     <div class="crow-name">{{ container.name }}</div>
@@ -82,7 +82,7 @@
                 <div class="col">
                     <section>
                         <h2 class="section-title">{{ $t("details") }}</h2>
-                        <div class="card">
+                        <div class="shadow-box">
                             <div class="kv-row"><div class="kv-k">{{ $t("driver") }}</div><div class="kv-v">{{ network.driver }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("subnet") }}</div><div class="kv-v mono">{{ network.subnet || "-" }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("scope") }}</div><div class="kv-v">{{ network.scope }}</div></div>
@@ -429,62 +429,62 @@ export default {
 
 .relation-panel {
     min-width: 0;
-    padding: 14px 16px;
+    padding: var(--rd-4);
 
     h3 {
-        font-size: 17px;
-        margin: 0 0 4px;
+        font-size: var(--rd-fs-section);
+        margin: 0 0 var(--rd-1);
         color: var(--strong);
     }
 }
 
 .relation-help, .relation-empty, .relation-warning {
-    font-size: 14px;
+    font-size: var(--rd-fs-small);
     color: var(--muted);
 }
 
-.relation-help { margin-bottom: 12px; }
-.relation-empty { padding: 15px 0; }
-.relation-warning { margin: 10px 0 0; }
+.relation-help { margin-bottom: var(--rd-3); }
+.relation-empty { padding: var(--rd-4) 0; }
+.relation-warning { margin: var(--rd-3) 0 0; }
 .relation-target { border: 1px dashed var(--card-border); }
-.relation-target.drag-over { border-color: #74c2ff; background: var(--panel-bg); }
+.relation-target.drag-over { border-color: $primary; background: var(--panel-bg); }
 
 .relation-container {
     position: relative;
-    padding: 10px 12px;
-    margin-top: 8px;
+    padding: var(--rd-3);
+    margin-top: var(--rd-2);
     border: 1px solid var(--card-border);
-    border-radius: 8px;
+    border-radius: var(--rd-radius-sm);
     background: var(--panel-bg);
     cursor: grab;
 
     &.attached { cursor: default; }
-    .btn { margin-top: 8px; }
+    .btn { margin-top: var(--rd-2); }
 }
 
-.relation-name { font-size: 14px; font-weight: 600; color: var(--strong); word-break: break-all; }
-.relation-sub { font-size: 13px; color: var(--muted); word-break: break-all; }
+.relation-name { font-size: var(--rd-fs-body); font-weight: 600; color: var(--strong); word-break: break-all; }
+.relation-sub { font-size: var(--rd-fs-small); color: var(--muted); word-break: break-all; }
 
 .merge-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
+    gap: var(--rd-2);
+    padding: var(--rd-2) var(--rd-3);
     margin-bottom: 6px;
     border: 1px solid var(--card-border);
-    border-radius: 8px;
+    border-radius: var(--rd-radius-sm);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--rd-fs-small);
 }
 
 .snippet {
-    margin: 4px 0 0;
-    padding: 10px;
-    border-radius: 8px;
+    margin: var(--rd-1) 0 0;
+    padding: var(--rd-3);
+    border-radius: var(--rd-radius-sm);
     background: var(--mono-bg);
     border: 1px solid var(--card-border);
     font-family: "JetBrains Mono", Menlo, monospace;
-    font-size: 12px;
+    font-size: var(--rd-fs-badge);
     line-height: 1.6;
     color: var(--strong);
     white-space: pre-wrap;

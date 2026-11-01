@@ -1,0 +1,47 @@
+@import "./vars.scss";
+
+/* One type scale, one spacing grid and one colour set for the whole resources
+ * section — sidebar, overview and detail pages all key off these values, so a
+ * heading or a row cannot pick a different size on a different page.
+ *
+ * Dark theme overrides live here too, which is why the pages do not carry
+ * their own `.dark` rules anymore.
+ */
+.resource-detail,
+.resource-sidebar {
+    /* type scale — five steps, nothing in between */
+    --rd-fs-title: 1.5rem;      /* 24px — page / resource name */
+    --rd-fs-section: 1.125rem;  /* 18px — section heading */
+    --rd-fs-body: 1rem;         /* 16px — primary row */
+    --rd-fs-small: 0.875rem;    /* 14px — secondary row, key/value */
+    --rd-fs-badge: 0.75rem;     /* 12px — badge, chip, code */
+
+    /* spacing — 4px grid */
+    --rd-1: 4px;
+    --rd-2: 8px;
+    --rd-3: 12px;
+    --rd-4: 16px;
+    --rd-5: 24px;
+
+    /* radii — cards follow .shadow-box, small controls use one step less */
+    --rd-radius: 10px;
+    --rd-radius-sm: 8px;
+
+    --card-bg: #fff;
+    --card-border: #dee2e6;
+    --panel-bg: #f6f7f9;
+    --strong: #111;
+    --muted: #6c757d;
+    --dim: #adb5bd;
+    --mono-bg: #f1f3f5;
+
+    .dark & {
+        --card-bg: #{$dark-bg};
+        --card-border: #{$dark-border-color};
+        --panel-bg: #{$dark-header-bg};
+        --strong: #dbe3eb;
+        --muted: #8b949e;
+        --dim: #5f6b76;
+        --mono-bg: #0b0f15;
+    }
+}

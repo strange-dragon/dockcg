@@ -17,11 +17,13 @@ A compose-first stack manager for Docker, forked from [Dockge](https://github.co
 New in this fork, on top of an otherwise unchanged compose workflow:
 
 - **Containers** — read-only inventory; any container can be turned into a **Compose draft** (image, env, ports, mounts, restart policy, networks). The original is never stopped or deleted.
-- **Images** — in-use / unused / dangling state, containers using each image, all tags of the same ID, digest, platform, pre-pull with live progress, targeted delete, previewed prune.
-- **Volumes** — mountpoint, owning stack + service, orphan cleanup, disk usage on demand, and **copy into a new empty volume** (source always kept).
+- **Images** — in-use / unused / dangling state, containers using each image, all tags of the same ID, digest, platform, targeted delete, previewed prune.
+- **Volumes** — mountpoint, owning stack + service, orphan cleanup, disk usage on demand.
 - **Networks** — inventory plus a relationship view: drag a service onto a network and its `compose.yaml` is edited for you (previewed, hash-guarded). Merge networks the same way. Unmanaged containers get an `external: true` snippet.
 - **Registries** — Docker Hub / ghcr.io / Harbor credentials, `docker login` in the background, password encrypted at rest.
 - **Overview** — one page with counts and previewed cleanup for all four resource types.
+
+Nothing here creates an image, volume or network: **new objects only ever come from a compose file**, and the resources section can inspect, edit the compose file or delete — never add.
 
 Three rules are enforced in code, not just documented: **no container lifecycle outside compose**, **changes go into `compose.yaml` instead of hidden CLI calls**, and **cleanup is itemised — never `docker prune`**.
 
@@ -136,8 +138,7 @@ docker build -f docker/Dockerfile --target release \
 
 ## Known limitations
 
-- Containers cannot be created, started or stopped here — that is the point. The Containers tab only produces a draft.
-- A volume copy targets a **new** volume; it never rewrites `compose.yaml` and refuses an existing target.
+- Nothing is created here — no containers, images, volumes or networks. New objects come from a compose file. The Containers tab only produces a draft.
 - Network changes only touch containers owned by a managed stack, and nothing is deployed for you.
 - Prune never removes a volume or network still declared in a managed Compose file.
 - English and Simplified Chinese only; English by default.

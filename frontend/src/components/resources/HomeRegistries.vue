@@ -142,7 +142,7 @@ export default {
 
 .source-group h3 {
     margin: 0 0 10px;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 600;
     color: #6c757d;
 
@@ -155,14 +155,14 @@ export default {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 13px;
+    font-size: 0.875rem;
 }
 
 .source-values code {
     max-width: 100%;
     overflow-wrap: anywhere;
     padding: 4px 7px;
-    border-radius: 5px;
+    border-radius: 6px;
     background: #f1f3f5;
     color: inherit;
 

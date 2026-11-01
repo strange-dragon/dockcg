@@ -2,17 +2,14 @@
     <div class="resource-detail">
         <template v-if="volume">
             <div class="detail-head">
-                <span class="badge badge-lg" :class="volume.used ? 'bg-primary' : volume.stack ? 'bg-secondary' : 'bg-warning'">
+                <span class="badge" :class="volume.used ? 'bg-primary' : volume.stack ? 'bg-secondary' : 'bg-warning'">
                     {{ volume.used ? $t("mounted") : volume.stack ? $t("composeOwned") : $t("orphaned") }}
                 </span>
                 <h1 class="detail-title">{{ volume.name }}</h1>
             </div>
 
             <div class="actions">
-                <button class="btn btn-dark" :disabled="busy" @click="openMigrate">
-                    <font-awesome-icon icon="right-left" /> {{ $t("migrate") }}
-                </button>
-                <button class="btn btn-dark" :disabled="busy" @click="load">
+                <button class="btn btn-normal" :disabled="busy" @click="load">
                     <font-awesome-icon icon="arrows-rotate" :spin="busy" /> {{ $t("refresh") }}
                 </button>
                 <button class="btn btn-danger" :disabled="volume.used || volume.stack || busy" :title="volume.stack ? $t('composeVolumeProtected') : volume.used ? $t('volumeMountedMsg') : $t('delete')" @click="$refs.confirm.show()">
@@ -25,7 +22,7 @@
                 <div class="col">
                     <section>
                         <h2 class="section-title">{{ $t("containers") }}</h2>
-                        <div class="card">
+                        <div class="shadow-box">
                             <div v-for="container in volume.containers" :key="container.id" class="crow">
                                 <div class="crow-main">
                                     <div class="crow-name">{{ container.name }}</div>
@@ -47,9 +44,9 @@
 
                     <section>
                         <h2 class="section-title">{{ $t("inComposeYaml") }}</h2>
-                        <div class="card" style="padding:12px">
+                        <div class="shadow-box">
                             <pre class="snippet">{{ composeSnippet }}</pre>
-                            <button class="btn btn-dark btn-sm mt-2" type="button" @click="copy(composeSnippet)">
+                            <button class="btn btn-normal btn-sm mt-2" type="button" @click="copy(composeSnippet)">
                                 <font-awesome-icon icon="copy" /> {{ $t("copy") }}
                             </button>
                         </div>
@@ -59,7 +56,7 @@
                 <div class="col">
                     <section>
                         <h2 class="section-title">{{ $t("details") }}</h2>
-                        <div class="card">
+                        <div class="shadow-box">
                             <div class="kv-row"><div class="kv-k">{{ $t("name") }}</div><div class="kv-v mono">{{ volume.name }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("driver") }}</div><div class="kv-v">{{ volume.driver }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("mountpoint") }}</div><div class="kv-v mono">{{ volume.mountpoint || "-" }}</div></div>
@@ -84,35 +81,11 @@
                             <div class="kv-row"><div class="kv-k">{{ $t("labels") }}</div><div class="kv-v mono">{{ labelText }}</div></div>
                         </div>
                     </section>
-
-                    <section>
-                        <h2 class="section-title">{{ $t("migration") }}</h2>
-                        <div class="card" style="padding:12px">
-                            <div class="muted small mb-2">{{ $t("migrationHint") }}</div>
-                            <button class="btn btn-dark btn-sm" type="button" @click="openMigrate">
-                                {{ $t("startMigration") }}
-                            </button>
-                        </div>
-                    </section>
                 </div>
             </div>
         </template>
 
         <div v-else-if="!loading" class="empty-state">{{ $t("selectVolumeHint") }}</div>
-
-        <!-- Migration -->
-        <BModal v-model="showMigrate" :title="$t('migrateVolumeTitle')" :ok-title="$t('startMigration')" :ok-disabled="migrating" @ok="doMigrate">
-            <p class="small text-muted">{{ $t("migrateVolumeHint") }}</p>
-
-            <label class="form-label">{{ $t("targetVolume") }}</label>
-            <input v-model="migrateForm.target" class="form-control mb-2" autocomplete="off" />
-            <p class="small text-muted">{{ $t("migrationKeepsSource") }}</p>
-
-            <div v-if="volume && volume.used" class="notice">
-                <font-awesome-icon icon="circle-info" class="me-2" />
-                {{ $t("volumeInUseMigration") }}
-            </div>
-        </BModal>
 
         <Confirm ref="confirm" :yes-text="$t('yes')" :no-text="$t('no')" btn-style="btn-danger" @yes="doRemove">
             {{ $t("confirmRemoveVolume") }}
@@ -141,13 +114,8 @@ export default {
             loading: false,
             requestId: 0,
             busy: false,
-            migrating: false,
-            showMigrate: false,
             usageLoading: false,
             usageText: "",
-            migrateForm: {
-                target: "",
-            },
         };
     },
 
@@ -236,37 +204,6 @@ export default {
             });
         },
 
-        openMigrate() {
-            if (!this.volume) {
-                return;
-            }
-            this.migrateForm.target = `${this.volume.name}_v2`;
-            this.showMigrate = true;
-        },
-
-        doMigrate() {
-            if (!this.volume) {
-                return;
-            }
-
-            this.migrating = true;
-
-            this.$root.emitAgent(this.endpoint, "migrateDockerVolume", {
-                source: this.volume.name,
-                target: this.migrateForm.target,
-                keepSource: true,
-                driver: this.volume.driver,
-            }, (res) => {
-                this.migrating = false;
-                this.$root.toastRes(res);
-
-                if (res.ok) {
-                    this.showMigrate = false;
-                    this.load();
-                }
-            });
-        },
-
         doRemove() {
             if (!this.volume) {
                 return;
@@ -300,7 +237,7 @@ export default {
 .snippet {
     margin: 0;
     font-family: "JetBrains Mono", Menlo, monospace;
-    font-size: 12px;
+    font-size: var(--rd-fs-badge);
     line-height: 1.6;
     color: var(--strong);
     white-space: pre-wrap;
@@ -309,12 +246,12 @@ export default {
 .notice {
     display: flex;
     align-items: center;
-    padding: 10px 12px;
-    border-radius: 8px;
+    padding: var(--rd-2) var(--rd-3);
+    border-radius: var(--rd-radius-sm);
     border: 1px solid rgba(248, 163, 6, 0.4);
     background: rgba(248, 163, 6, 0.08);
-    color: #f8a306;
-    font-size: 12.5px;
+    color: $warning;
+    font-size: var(--rd-fs-small);
 }
 
 .muted {

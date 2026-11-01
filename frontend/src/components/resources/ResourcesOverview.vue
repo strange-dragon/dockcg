@@ -1,5 +1,5 @@
 <template>
-    <div class="resources-overview">
+    <div class="resource-detail resources-overview">
         <div class="overview-heading">
             <div>
                 <h1>{{ $t("dockerResources") }}</h1>
@@ -191,7 +191,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "../../styles/vars.scss";
+@import "../../styles/resource-detail.scss";
 
 .overview-heading,
 .card-heading,
@@ -199,34 +199,36 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--rd-3);
 }
 
 .overview-heading {
     align-items: flex-start;
-    margin-bottom: 20px;
+    margin-bottom: var(--rd-5);
 
-    h1 { font-size: 24px; margin: 0 0 6px; }
-    p { color: #6c757d; margin: 0; font-size: 14px; }
-    .dark & p { color: $dark-font-color; }
+    h1 { font-size: var(--rd-fs-title); margin: 0 0 6px; line-height: 1.3; }
+    p { color: var(--muted); margin: 0; font-size: var(--rd-fs-small); }
 }
 
 .overview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 16px;
+    gap: var(--rd-4);
 }
 
-.overview-card { padding: 16px; min-width: 0; }
-.card-heading { margin-bottom: 12px; }
-.card-heading h2 { display: inline; font-size: 17px; margin: 0; }
-.card-heading a { font-size: 13px; white-space: nowrap; }
-.card-count { margin-left: 8px; color: #6c757d; font-size: 14px; }
-.overview-item { padding: 9px 0; border-top: 1px solid #e7e9ec; text-decoration: none; font-size: 14px; }
-.dark .overview-item { border-color: $dark-border-color; }
+.overview-card { padding: var(--rd-4); min-width: 0; }
+.card-heading { margin-bottom: var(--rd-3); }
+.card-heading h2 { display: inline; font-size: var(--rd-fs-section); margin: 0; }
+.card-heading a { font-size: var(--rd-fs-small); white-space: nowrap; }
+.card-count { margin-left: var(--rd-2); color: var(--muted); font-size: var(--rd-fs-small); }
+.overview-item {
+    padding: var(--rd-2) 0;
+    border-top: 1px solid var(--card-border);
+    text-decoration: none;
+    font-size: var(--rd-fs-body);
+}
 .item-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.overview-item .badge { flex: 0 0 auto; font-size: 11px; }
-.empty-list, .more-count, .overview-status { padding: 12px 0; color: #6c757d; font-size: 14px; }
-.dark .empty-list, .dark .more-count, .dark .overview-status { color: $dark-font-color; }
+.overview-item .badge { flex: 0 0 auto; }
+.empty-list, .more-count, .overview-status { padding: var(--rd-3) 0; color: var(--muted); font-size: var(--rd-fs-small); }
 .prune-list { max-height: 35vh; overflow: auto; overflow-wrap: anywhere; }
 </style>

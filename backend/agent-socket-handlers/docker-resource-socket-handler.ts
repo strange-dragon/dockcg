@@ -2,8 +2,6 @@ import { AgentSocketHandler } from "../agent-socket-handler";
 import { DockcgServer } from "../dockcg-server";
 import { callbackError, callbackResult, checkLogin, DockcgSocket, ValidationError } from "../util-server";
 import { AgentSocket } from "../../common/agent-socket";
-import { getImagePullTerminalName } from "../../common/util-common";
-import { Terminal } from "../terminal";
 import { R } from "redbean-node";
 import { Registry } from "../models/registry";
 import { decryptSecret, encryptSecret } from "../secret-box";
@@ -28,17 +26,11 @@ import {
     removeNetwork,
     removeVolume
 } from "../docker-resources";
-import {
-    createNetwork,
-    createVolume,
-    inspectImage,
-    migrateVolume
-} from "../docker-resource-actions";
+import { inspectImage } from "../docker-resource-actions";
 import { log } from "../log";
 import { createContainerComposeDraft } from "../container-compose-draft";
 import { createHash } from "node:crypto";
 
-const IMAGE_REFERENCE_REGEX = /^[A-Za-z0-9][A-Za-z0-9._\-/:@]*$/;
 const REGISTRY_URL_REGEX = /^[A-Za-z0-9._\-:/]+$/;
 
 function requireString(value : unknown, fieldName : string) : string {
@@ -119,44 +111,6 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 const images = await listImages(containers);
                 callbackResult({ ok: true,
                     images }, callback);
-            } catch (e) {
-                callbackError(e, callback);
-            }
-        });
-
-        // Pre-pull an image so users can warm the cache before editing a compose file
-        agentSocket.on("pullDockerImage", async (imageReference : unknown, callback) => {
-            try {
-                checkLogin(socket);
-
-                const reference = requireString(imageReference, "Image reference");
-
-                if (reference.length > 255 || !IMAGE_REFERENCE_REGEX.test(reference)) {
-                    throw new ValidationError("Invalid image reference");
-                }
-
-                let exitCode : number;
-
-                try {
-                    exitCode = await Terminal.exec(
-                        server,
-                        socket,
-                        getImagePullTerminalName(socket.endpoint),
-                        "docker",
-                        [ "pull", reference ],
-                        server.stacksDir
-                    );
-                } catch (e) {
-                    // Terminal.exec() rejects with a plain string when a terminal is already running
-                    throw new Error(e instanceof Error ? e.message : String(e));
-                }
-
-                if (exitCode !== 0) {
-                    throw new Error("Failed to pull the image, please check the terminal output.");
-                }
-
-                callbackResult({ ok: true,
-                    msg: "Image pulled successfully" }, callback);
             } catch (e) {
                 callbackError(e, callback);
             }
@@ -245,71 +199,6 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 const include = requireBoolean(includeCompose, "includeCompose");
                 const result = await pruneVolumes(include, server.stacksDir);
                 callbackResult({ ok: true,
-                    ...result }, callback);
-            } catch (e) {
-                callbackError(e, callback);
-            }
-        });
-
-        agentSocket.on("createDockerVolume", async (payload : unknown, callback) => {
-            try {
-                checkLogin(socket);
-
-                if (typeof payload !== "object" || payload === null) {
-                    throw new ValidationError("Invalid volume data");
-                }
-
-                const data = payload as { name? : unknown, driver? : unknown };
-                const driver = typeof data.driver === "string" && data.driver !== "" ? data.driver : "local";
-                const name = await createVolume(requireString(data.name, "Volume name"), driver);
-
-                callbackResult({ ok: true,
-                    msg: `Volume ${name} created`,
-                    name }, callback);
-            } catch (e) {
-                callbackError(e, callback);
-            }
-        });
-
-        // Migrate copies data between volumes; it never touches compose files, the
-        // user switches compose.yaml over to the new volume afterwards.
-        agentSocket.on("migrateDockerVolume", async (payload : unknown, callback) => {
-            try {
-                checkLogin(socket);
-
-                if (typeof payload !== "object" || payload === null) {
-                    throw new ValidationError("Invalid migration data");
-                }
-
-                const data = payload as {
-                    source? : unknown,
-                    target? : unknown,
-                    keepSource? : unknown,
-                    driver? : unknown,
-                };
-
-                const source = requireString(data.source, "Source volume");
-                const target = requireString(data.target, "Target volume");
-                const keepSource = typeof data.keepSource === "boolean" ? data.keepSource : true;
-                const driver = typeof data.driver === "string" && data.driver !== "" ? data.driver : "local";
-
-                // Refuse while a container still mounts the source: the copy would be inconsistent
-                const containers = await listContainers();
-                const volumes = await listVolumes(containers);
-                const sourceInfo = volumes.find((volume) => volume.name === source);
-
-                if (!sourceInfo) {
-                    throw new ValidationError("Source volume not found");
-                }
-                if (sourceInfo.used) {
-                    throw new ValidationError("A container is still mounting this volume. Stop the stack first.");
-                }
-
-                const result = await migrateVolume(source, target, { keepSource,
-                    driver });
-
-                callbackResult({ ok: true,
-                    msg: `Data copied to ${result.target}`,
                     ...result }, callback);
             } catch (e) {
                 callbackError(e, callback);
@@ -462,27 +351,6 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 const result = await pruneNetworks(include, server.stacksDir);
                 callbackResult({ ok: true,
                     ...result }, callback);
-            } catch (e) {
-                callbackError(e, callback);
-            }
-        });
-
-        agentSocket.on("createDockerNetwork", async (payload : unknown, callback) => {
-            try {
-                checkLogin(socket);
-
-                if (typeof payload !== "object" || payload === null) {
-                    throw new ValidationError("Invalid network data");
-                }
-
-                const data = payload as { name? : unknown, driver? : unknown, internal? : unknown };
-                const driver = typeof data.driver === "string" && data.driver !== "" ? data.driver : "bridge";
-                const internal = data.internal === true;
-                const name = await createNetwork(requireString(data.name, "Network name"), driver, internal);
-
-                callbackResult({ ok: true,
-                    msg: `Network ${name} created`,
-                    name }, callback);
             } catch (e) {
                 callbackError(e, callback);
             }

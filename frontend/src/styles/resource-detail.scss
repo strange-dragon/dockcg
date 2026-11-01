@@ -1,38 +1,26 @@
 @import "./vars.scss";
+@import "./resource-tokens.scss";
 
 /* Shared look for the resource detail pages.
- * Colours go through custom properties so the light theme keeps working. */
+ *
+ * Sizes come from resource-tokens.scss, cards are Dockge's own `.shadow-box`
+ * and buttons keep Dockge's `.btn` / `.btn-normal` styling — nothing visual is
+ * redefined here that Dockge already provides.
+ */
 .resource-detail {
-    --card-bg: #fff;
-    --card-border: #dee2e6;
-    --panel-bg: #f6f7f9;
-    --strong: #111;
-    --muted: #6c757d;
-    --dim: #adb5bd;
-    --mono-bg: #f1f3f5;
-
-    .dark & {
-        --card-bg: #{$dark-bg};
-        --card-border: #{$dark-border-color};
-        --panel-bg: #{$dark-header-bg};
-        --strong: #dbe3eb;
-        --muted: #8b949e;
-        --dim: #5f6b76;
-        --mono-bg: #0b0f15;
-    }
-
     .detail-head {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
+        gap: var(--rd-3);
+        margin-bottom: var(--rd-3);
     }
 
     .detail-title {
         margin: 0;
-        font-size: 24px;
+        font-size: var(--rd-fs-title);
         font-weight: 600;
+        line-height: 1.3;
         color: var(--strong);
         word-break: break-all;
 
@@ -42,54 +30,30 @@
         }
     }
 
-    .badge-lg {
-        font-size: 12px;
-        font-weight: 700;
-        padding: 5px 10px;
-        border-radius: 50rem;
-    }
-
     .actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 10px;
+        gap: var(--rd-2);
+        margin-bottom: var(--rd-3);
 
+        /* Dockge already styles .btn and .btn-sm — only the layout stays here */
         .btn {
-            border-radius: 50rem;
-            font-size: 14px;
-            padding: 6px 14px;
             display: inline-flex;
             align-items: center;
             gap: 6px;
         }
     }
 
-    .btn-dark {
-        background: var(--panel-bg);
-        border: 1px solid var(--card-border);
-        color: var(--strong);
-
-        &:hover:not(:disabled) {
-            border-color: $primary;
-            color: $primary;
-        }
-
-        &:disabled {
-            opacity: 0.45;
-        }
-    }
-
     .note {
-        margin-bottom: 16px;
-        font-size: 14px;
+        margin-bottom: var(--rd-4);
+        font-size: var(--rd-fs-small);
         color: var(--dim);
     }
 
     .detail-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 20px;
+        gap: var(--rd-5);
 
         @media (max-width: 1200px) {
             grid-template-columns: 1fr;
@@ -97,28 +61,26 @@
     }
 
     .section-title {
-        margin: 0 0 8px;
-        font-size: 17px;
+        margin: 0 0 var(--rd-2);
+        font-size: var(--rd-fs-section);
         font-weight: 600;
         color: var(--strong);
     }
 
     section {
-        margin-bottom: 20px;
+        margin-bottom: var(--rd-5);
     }
 
-    .card {
-        background: var(--card-bg);
-        border: 1px solid var(--card-border);
-        border-radius: 10px;
-        padding: 4px 12px;
+    /* Inside a .shadow-box the list sits flush, so the card keeps its padding */
+    .shadow-box {
+        border-radius: var(--rd-radius);
     }
 
     .kv-row {
         display: flex;
-        gap: 12px;
-        padding: 8px 0;
-        font-size: 14px;
+        gap: var(--rd-3);
+        padding: var(--rd-2) 0;
+        font-size: var(--rd-fs-small);
         border-bottom: 1px solid var(--card-border);
 
         &:last-child {
@@ -137,16 +99,18 @@
         word-break: break-all;
     }
 
+    /* Inherits the row size: a separate mono step was what made the detail
+     * pages look uneven next to the overview. */
     .mono {
         font-family: "JetBrains Mono", Menlo, monospace;
-        font-size: 13px;
+        font-size: inherit;
     }
 
     .crow {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 10px 0;
+        gap: var(--rd-3);
+        padding: var(--rd-3) 0;
         border-bottom: 1px solid var(--card-border);
 
         &:last-child {
@@ -160,32 +124,33 @@
     }
 
     .crow-name {
-        font-size: 14px;
+        font-size: var(--rd-fs-body);
         font-weight: 600;
         color: var(--strong);
     }
 
     .crow-sub {
-        font-size: 13px;
+        font-size: var(--rd-fs-small);
         color: var(--muted);
         word-break: break-all;
     }
 
     .chip {
         display: inline-block;
-        padding: 2px 9px;
+        padding: 2px var(--rd-2);
         margin: 0 6px 6px 0;
         border-radius: 50rem;
         background: var(--mono-bg);
         border: 1px solid var(--card-border);
         font-family: "JetBrains Mono", Menlo, monospace;
-        font-size: 12px;
+        font-size: var(--rd-fs-badge);
         color: var(--strong);
     }
 
     .empty-state {
         padding: 40px 10px;
         text-align: center;
+        font-size: var(--rd-fs-small);
         color: var(--dim);
     }
 }

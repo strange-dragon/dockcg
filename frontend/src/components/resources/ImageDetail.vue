@@ -2,7 +2,7 @@
     <div :key="$route.fullPath" class="resource-detail">
         <template v-if="image">
             <div class="detail-head">
-                <span class="badge badge-lg" :class="stateClass">{{ $t(stateLabel) }}</span>
+                <span class="badge" :class="stateClass">{{ $t(stateLabel) }}</span>
                 <h1 class="detail-title">
                     <span v-if="image.dangling" class="mono">&lt;none&gt;:&lt;none&gt;</span>
                     <template v-else>{{ image.repository }}<span class="tag">:{{ image.tag }}</span></template>
@@ -10,10 +10,7 @@
             </div>
 
             <div class="actions">
-                <button class="btn btn-dark" :disabled="busy || image.dangling" @click="pullLatest">
-                    <font-awesome-icon icon="cloud-arrow-down" /> {{ $t("pullLatest") }}
-                </button>
-                <button class="btn btn-dark" :disabled="busy" @click="load">
+                <button class="btn btn-normal" :disabled="busy" @click="load">
                     <font-awesome-icon icon="arrows-rotate" :spin="busy" /> {{ $t("refresh") }}
                 </button>
                 <button class="btn btn-danger" :disabled="image.used || busy" :title="image.used ? $t('imageInUseMsg') : $t('delete')" @click="$refs.confirm.show()">
@@ -26,7 +23,7 @@
                 <div class="col">
                     <section>
                         <h2 class="section-title">{{ $t("containers") }}</h2>
-                        <div class="card">
+                        <div class="shadow-box">
                             <div v-for="container in image.containers" :key="container.id" class="crow">
                                 <div class="crow-main">
                                     <div class="crow-name">{{ container.name }}</div>
@@ -48,7 +45,7 @@
 
                     <section>
                         <h2 class="section-title">{{ $t("tags") }}</h2>
-                        <div class="card" style="padding:12px">
+                        <div class="shadow-box">
                             <span v-for="tagName in siblingTags" :key="tagName" class="chip">{{ tagName }}</span>
                             <span v-if="siblingTags.length === 0" class="chip">&lt;none&gt;</span>
                         </div>
@@ -58,7 +55,7 @@
                 <div class="col">
                     <section>
                         <h2 class="section-title">{{ $t("details") }}</h2>
-                        <div class="card">
+                        <div class="shadow-box">
                             <div class="kv-row"><div class="kv-k">{{ $t("size") }}</div><div class="kv-v">{{ formatBytes(image.size) }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("imageID") }}</div><div class="kv-v mono">sha256:{{ image.shortID }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("digest") }}</div><div class="kv-v mono">{{ detail.digest || "-" }}</div></div>
@@ -223,20 +220,6 @@ export default {
                 if (requestId === this.requestId && res.ok) {
                     this.detail = res.detail;
                 }
-            });
-        },
-
-        pullLatest() {
-            if (!this.image || this.image.dangling) {
-                return;
-            }
-
-            this.busy = true;
-
-            this.$root.emitAgent(this.endpoint, "pullDockerImage", `${this.image.repository}:${this.image.tag}`, (res) => {
-                this.busy = false;
-                this.$root.toastRes(res);
-                this.load();
             });
         },
 

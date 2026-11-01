@@ -17,9 +17,10 @@
             </button>
         </div>
 
-        <div v-if="activeTab !== 'overview' && activeTab !== 'containers'" class="side-action">
-            <button class="btn btn-primary w-100" type="button" @click="primaryAction">
-                <font-awesome-icon :icon="actionIcon" /> {{ $t(actionLabel) }}
+        <!-- New stacks still start from a compose file; the resource tabs are read-only -->
+        <div v-if="activeTab === 'stacks'" class="side-action">
+            <button class="btn btn-primary w-100" type="button" @click="$router.push('/compose')">
+                <font-awesome-icon icon="plus" /> {{ $t("compose") }}
             </button>
         </div>
 
@@ -59,73 +60,26 @@
                 </button>
             </div>
         </div>
-
-        <!-- Pull image -->
-        <BModal v-model="showPull" :title="$t('pullImage')" :ok-title="$t('pull')" @ok="doPull">
-            <p class="small text-muted">{{ $t("pullImageHint") }}</p>
-            <input v-model="pullReference" class="form-control" :placeholder="$t('imageReferencePlaceholder')" autocomplete="off" spellcheck="false" />
-            <Terminal v-if="showPullTerminal" :name="pullTerminalName" :endpoint="endpoint" :rows="6" class="mt-3" />
-        </BModal>
-
-        <!-- Create volume -->
-        <BModal v-model="showCreateVolume" :title="$t('createVolume')" :ok-title="$t('create')" @ok="doCreateVolume">
-            <p class="small text-muted">{{ $t("createVolumeHint") }}</p>
-            <label class="form-label">{{ $t("name") }}</label>
-            <input v-model="volumeForm.name" class="form-control mb-2" placeholder="shared_uploads" autocomplete="off" />
-            <label class="form-label">{{ $t("driver") }}</label>
-            <select v-model="volumeForm.driver" class="form-select">
-                <option value="local">local</option>
-                <option value="nfs">nfs</option>
-            </select>
-        </BModal>
-
-        <!-- Create network -->
-        <BModal v-model="showCreateNetwork" :title="$t('createNetwork')" :ok-title="$t('create')" @ok="doCreateNetwork">
-            <p class="small text-muted">{{ $t("createNetworkHint") }}</p>
-            <label class="form-label">{{ $t("name") }}</label>
-            <input v-model="networkForm.name" class="form-control mb-2" placeholder="proxy_network" autocomplete="off" />
-            <label class="form-label">{{ $t("driver") }}</label>
-            <select v-model="networkForm.driver" class="form-select mb-2">
-                <option value="bridge">bridge</option>
-                <option value="overlay">overlay</option>
-                <option value="macvlan">macvlan</option>
-            </select>
-            <div class="form-check">
-                <input id="net-internal" v-model="networkForm.internal" class="form-check-input" type="checkbox" />
-                <label class="form-check-label" for="net-internal">{{ $t("networkInternal") }}</label>
-            </div>
-        </BModal>
     </div>
 </template>
 
 <script>
 import StackList from "./StackList.vue";
-import Terminal from "./Terminal.vue";
-import { getImagePullTerminalName } from "../../../common/util-common";
 
 const TABS = [
     { key: "containers",
-        label: "containers",
-        action: "scanContainers",
-        icon: "arrows-rotate" },
+        label: "containers" },
     { key: "images",
-        label: "images",
-        action: "pullImage",
-        icon: "cloud-arrow-down" },
+        label: "images" },
     { key: "volumes",
-        label: "volumes",
-        action: "createVolume",
-        icon: "plus" },
+        label: "volumes" },
     { key: "networks",
-        label: "networks",
-        action: "createNetwork",
-        icon: "plus" },
+        label: "networks" },
 ];
 
 export default {
     components: {
         StackList,
-        Terminal,
     },
 
     props: {
@@ -148,28 +102,10 @@ export default {
             containers: [],
             volumes: [],
             networks: [],
-            showPull: false,
-            showPullTerminal: false,
-            pullReference: "",
-            showCreateVolume: false,
-            showCreateNetwork: false,
-            volumeForm: {
-                name: "",
-                driver: "local",
-            },
-            networkForm: {
-                name: "",
-                driver: "bridge",
-                internal: false,
-            },
         };
     },
 
     computed: {
-        pullTerminalName() {
-            return getImagePullTerminalName(this.endpoint);
-        },
-
         activeTab() {
             const path = this.$route.path;
 
@@ -189,14 +125,6 @@ export default {
                 return "overview";
             }
             return "stacks";
-        },
-
-        actionLabel() {
-            return this.tabs.find((tab) => tab.key === this.activeTab)?.action || "compose";
-        },
-
-        actionIcon() {
-            return this.tabs.find((tab) => tab.key === this.activeTab)?.icon || "plus";
         },
 
         hasMultipleEndpoints() {
@@ -316,22 +244,6 @@ export default {
                 query: { name: row.query } });
         },
 
-        primaryAction() {
-            if (this.activeTab === "images") {
-                this.showPull = true;
-                return;
-            }
-            if (this.activeTab === "volumes") {
-                this.showCreateVolume = true;
-                return;
-            }
-            if (this.activeTab === "networks") {
-                this.showCreateNetwork = true;
-                return;
-            }
-            this.$router.push("/compose");
-        },
-
         refresh() {
             const requestId = ++this.requestId;
             this.loadError = "";
@@ -400,58 +312,22 @@ export default {
             this.loading = false;
         },
 
-        doPull() {
-            const reference = this.pullReference.trim();
-
-            if (!reference) {
-                return;
-            }
-
-            this.showPullTerminal = true;
-
-            this.$root.emitAgent(this.endpoint, "pullDockerImage", reference, (res) => {
-                this.$root.toastRes(res);
-                this.pullReference = "";
-                this.refresh();
-            });
-        },
-
-        doCreateVolume() {
-            this.$root.emitAgent(this.endpoint, "createDockerVolume", this.volumeForm, (res) => {
-                this.$root.toastRes(res);
-
-                if (res.ok) {
-                    this.volumeForm.name = "";
-                    this.refresh();
-                }
-            });
-        },
-
-        doCreateNetwork() {
-            this.$root.emitAgent(this.endpoint, "createDockerNetwork", this.networkForm, (res) => {
-                this.$root.toastRes(res);
-
-                if (res.ok) {
-                    this.networkForm.name = "";
-                    this.refresh();
-                }
-            });
-        },
     },
 };
 </script>
 
 <style lang="scss" scoped>
 @import "../styles/vars.scss";
+@import "../styles/resource-tokens.scss";
 
 .overview-link {
     display: block;
-    padding: 10px 12px;
-    margin-bottom: 10px;
-    border-radius: 10px;
+    padding: var(--rd-2) var(--rd-3);
+    margin-bottom: var(--rd-2);
+    border-radius: var(--rd-radius);
     color: #343a40;
     text-decoration: none;
-    font-size: 14px;
+    font-size: var(--rd-fs-body);
     font-weight: 600;
 
     &:hover, &.active { background: #eef4fa; color: #246ca0; }
@@ -462,10 +338,10 @@ export default {
 .seg {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-    padding: 4px;
-    margin-bottom: 10px;
-    border-radius: 10px;
+    gap: var(--rd-1);
+    padding: var(--rd-1);
+    margin-bottom: var(--rd-2);
+    border-radius: var(--rd-radius);
     background: #f1f3f5;
 
     .dark & {
@@ -475,12 +351,12 @@ export default {
 
 .seg-item {
     flex: 1;
-    padding: 6px 4px;
+    padding: 6px var(--rd-1);
     border: 0;
-    border-radius: 7px;
+    border-radius: 6px;
     background: transparent;
     color: #495057;
-    font-size: 13px;
+    font-size: var(--rd-fs-small);
     line-height: 1.2;
     cursor: pointer;
     transition: all 0.1s ease-in-out;
@@ -501,12 +377,12 @@ export default {
 }
 
 .side-action {
-    margin-bottom: 10px;
+    margin-bottom: var(--rd-2);
 }
 
 .resource-list-box {
-    padding: 10px;
-    border-radius: 10px;
+    padding: var(--rd-3);
+    border-radius: var(--rd-radius);
 }
 
 .resource-rows {
@@ -517,15 +393,15 @@ export default {
 .resource-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--rd-2);
     width: 100%;
-    padding: 7px 9px;
+    padding: var(--rd-2) var(--rd-3);
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--rd-radius-sm);
     background: transparent;
     color: inherit;
     text-align: left;
-    font-size: 14px;
+    font-size: var(--rd-fs-body);
     cursor: pointer;
     transition: background 0.1s ease-in-out;
 
@@ -543,9 +419,6 @@ export default {
 
     .badge {
         flex: 0 0 auto;
-        font-size: 11px;
-        font-weight: 600;
-        padding: 3px 7px;
     }
 
     .resource-name {
@@ -555,17 +428,15 @@ export default {
     }
 
     .tag {
-        color: #6c757d;
-        .dark & { color: $dark-font-color; }
+        color: var(--muted);
     }
 }
 
 .empty {
-    padding: 18px 8px;
+    padding: var(--rd-4) var(--rd-2);
     text-align: center;
-    color: #6c757d;
-    font-size: 14px;
-    .dark & { color: $dark-font-color; }
+    color: var(--muted);
+    font-size: var(--rd-fs-small);
 }
 
 .resource-footer {
@@ -573,14 +444,13 @@ export default {
     text-align: right;
 
     .btn-link {
-        color: #6c757d;
+        color: var(--muted);
         text-decoration: none;
-        font-size: 13px;
-        .dark & { color: $dark-font-color; }
+        font-size: var(--rd-fs-small);
     }
 }
 
 .search-input {
-    font-size: 14px;
+    font-size: var(--rd-fs-small);
 }
 </style>

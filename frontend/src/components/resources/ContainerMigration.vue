@@ -2,11 +2,11 @@
     <div class="resource-detail">
         <div class="detail-head"><h1 class="detail-title">{{ $t("containerMigration") }}</h1></div>
         <p class="note">{{ $t("containerMigrationHint") }}</p>
-        <button class="btn btn-dark mb-3" :disabled="loading" @click="load">{{ $t("refresh") }}</button>
+        <button class="btn btn-normal mb-3" :disabled="loading" @click="load">{{ $t("refresh") }}</button>
         <router-link v-if="selectedId" class="btn btn-link mb-3" to="/resources/containers">{{ $t("viewAll") }}</router-link>
         <div v-if="error" class="alert alert-danger">{{ error }}</div>
         <div v-if="loading">{{ $t("loadingResources") }}</div>
-        <div v-for="container in visibleContainers" :key="container.id" class="card mb-2 p-3 d-flex flex-row justify-content-between align-items-center gap-2">
+        <div v-for="container in visibleContainers" :key="container.id" class="shadow-box mb-2 p-3 d-flex flex-row justify-content-between align-items-center gap-2">
             <div>
                 <strong>{{ container.name }}</strong>
                 <div class="small text-muted">{{ container.image }} · {{ container.state }} <span v-if="container.stack">· {{ container.stack }}/{{ container.service }}</span></div>
