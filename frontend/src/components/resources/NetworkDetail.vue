@@ -23,11 +23,11 @@
             <div class="note">{{ $t("networkDetailNote") }}</div>
 
             <section class="relation-section">
-                <h2 class="section-title">{{ $t("networkRelations") }}</h2>
+                <h2 class="section-title h5">{{ $t("networkRelations") }}</h2>
                 <p class="note">{{ $t("networkRelationHint") }}</p>
                 <div class="relation-grid">
                     <div class="shadow-box relation-panel">
-                        <h3>{{ $t("availableContainers") }}</h3>
+                        <h3 class="h5">{{ $t("availableContainers") }}</h3>
                         <p class="relation-help">{{ $t("dragContainerHint") }}</p>
                         <div v-if="availableContainers.length === 0" class="relation-empty">{{ $t("noAvailableContainers") }}</div>
                         <div v-for="entry in availableContainers" :key="entry.id" class="relation-container" draggable="true" @dragstart="onDragStart($event, entry)" @dragend="onDragEnd">
@@ -39,7 +39,7 @@
                         </div>
                     </div>
                     <div class="shadow-box relation-panel relation-target" :class="{ 'drag-over': dragOver && !network.builtIn }" @dragover.prevent="onDragOver" @dragleave="dragOver = false" @drop.prevent="onDrop">
-                        <h3>{{ network.name }}</h3>
+                        <h3 class="h5">{{ network.name }}</h3>
                         <p class="relation-help">{{ $t(network.builtIn ? "builtInNetworkMsg" : "dropContainerHint") }}</p>
                         <div v-if="network.containers.length === 0" class="relation-empty">{{ $t("noContainerUsesNetwork") }}</div>
                         <div v-for="container in network.containers" :key="container.id" class="relation-container attached">
@@ -57,7 +57,7 @@
             <div class="detail-grid">
                 <div class="col">
                     <section>
-                        <h2 class="section-title">{{ $t("connectedContainers") }}</h2>
+                        <h2 class="section-title h5">{{ $t("connectedContainers") }}</h2>
                         <div class="shadow-box">
                             <div v-for="container in network.containers" :key="container.id" class="crow">
                                 <div class="crow-main">
@@ -81,7 +81,7 @@
 
                 <div class="col">
                     <section>
-                        <h2 class="section-title">{{ $t("details") }}</h2>
+                        <h2 class="section-title h5">{{ $t("details") }}</h2>
                         <div class="shadow-box">
                             <div class="kv-row"><div class="kv-k">{{ $t("driver") }}</div><div class="kv-v">{{ network.driver }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("subnet") }}</div><div class="kv-v mono">{{ network.subnet || "-" }}</div></div>
@@ -432,7 +432,6 @@ export default {
     padding: var(--rd-4);
 
     h3 {
-        font-size: var(--rd-fs-section);
         margin: 0 0 var(--rd-1);
         color: var(--strong);
     }
@@ -462,7 +461,7 @@ export default {
     .btn { margin-top: var(--rd-2); }
 }
 
-.relation-name { font-size: var(--rd-fs-body); font-weight: 600; color: var(--strong); word-break: break-all; }
+.relation-name { font-weight: 600; color: var(--strong); word-break: break-all; }
 .relation-sub { font-size: var(--rd-fs-small); color: var(--muted); word-break: break-all; }
 
 .merge-item {
@@ -484,7 +483,7 @@ export default {
     background: var(--mono-bg);
     border: 1px solid var(--card-border);
     font-family: "JetBrains Mono", Menlo, monospace;
-    font-size: var(--rd-fs-badge);
+    font-size: var(--rd-fs-small);
     line-height: 1.6;
     color: var(--strong);
     white-space: pre-wrap;
