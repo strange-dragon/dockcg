@@ -327,7 +327,6 @@ export default {
     border-radius: var(--rd-radius);
     color: #343a40;
     text-decoration: none;
-    font-size: var(--rd-fs-body);
     font-weight: 600;
 
     &:hover, &.active { background: #eef4fa; color: #246ca0; }
@@ -401,7 +400,6 @@ export default {
     background: transparent;
     color: inherit;
     text-align: left;
-    font-size: var(--rd-fs-body);
     cursor: pointer;
     transition: background 0.1s ease-in-out;
 
