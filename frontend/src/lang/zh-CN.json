@@ -416,5 +416,9 @@
     "image": "镜像",
     "ports": "端口",
     "registrySourcePath": "读取自",
-    "credentialsManagedBy": "凭据由外部 helper 管理，仓库列表不在配置文件里："
+    "credentialsManagedBy": "凭据由外部 helper 管理，仓库列表不在配置文件里：",
+    "defaultRegistry": "默认",
+    "defaultRegistryHint": "Docker Hub 是内置仓库，不能移除",
+    "removeSource": "移除",
+    "sourceFromDockerConfig": "来自 Docker 配置（config.json），不能在这里移除"
 }

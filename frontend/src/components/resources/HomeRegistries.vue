@@ -48,6 +48,7 @@ export default {
         return {
             registries: [],
             sources: { loginRegistries: [],
+                managedLogins: [],
                 mirrors: [],
                 configError: "",
                 daemonError: "",
@@ -84,6 +85,7 @@ export default {
                 if (res?.ok) {
                     this.registries = res.registries || [];
                     this.sources = res.sources || { loginRegistries: [],
+                        managedLogins: [],
                         mirrors: [],
                         configError: "",
                         daemonError: "",

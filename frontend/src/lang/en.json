@@ -416,5 +416,9 @@
     "image": "Image",
     "ports": "Ports",
     "registrySourcePath": "Read from",
-    "credentialsManagedBy": "Credentials are owned by an external helper, so the registry list is not in the config file:"
+    "credentialsManagedBy": "Credentials are owned by an external helper, so the registry list is not in the config file:",
+    "defaultRegistry": "Default",
+    "defaultRegistryHint": "Docker Hub is the built-in registry and cannot be removed",
+    "removeSource": "Remove",
+    "sourceFromDockerConfig": "Comes from the Docker config (config.json) and cannot be removed here"
 }

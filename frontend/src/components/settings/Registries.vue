@@ -37,7 +37,22 @@
                 <div class="source-group small">
                     <strong>{{ $t("dockerLoginSources") }}</strong>
                     <span v-if="sources.loginRegistries.length === 0" class="text-muted">{{ $t("noDockerLoginSources") }}</span>
-                    <code v-for="name in sources.loginRegistries" :key="name" class="source-chip">{{ name }}</code>
+                    <span
+                        v-for="name in sources.loginRegistries" :key="name" class="source-chip"
+                        :title="name === 'docker.io' ? $t('defaultRegistryHint') : (managedLogin(name) ? '' : $t('sourceFromDockerConfig'))"
+                    >
+                        {{ name }}
+                        <span v-if="name === 'docker.io'" class="source-tag">{{ $t("defaultRegistry") }}</span>
+                        <button
+                            v-else-if="managedLogin(name)" class="chip-remove" type="button"
+                            :title="$t('removeSource')" @click="removeSource(managedLogin(name))"
+                        >
+                            <font-awesome-icon icon="times" />
+                        </button>
+                    </span>
+                    <button class="btn btn-sm btn-normal add-source" type="button" @click="showForm = true">
+                        <font-awesome-icon icon="plus" /> {{ $t("addRegistry") }}
+                    </button>
                 </div>
                 <div class="source-group small">
                     <strong>{{ $t("dockerRegistryMirrors") }}</strong>
@@ -163,6 +178,7 @@ export default {
         return {
             registries: [],
             sources: { loginRegistries: [],
+                managedLogins: [],
                 mirrors: [],
                 configError: "",
                 daemonError: "",
@@ -206,6 +222,19 @@ export default {
     },
 
     methods: {
+        /** A chip that maps to a registry saved in Dockcg can be removed here. */
+        managedLogin(name) {
+            return (this.sources.managedLogins || []).find((item) => item.label === name) || null;
+        },
+
+        removeSource(entry) {
+            const registry = this.registries.find((item) => String(item.id) === String(entry.id));
+
+            if (registry) {
+                this.askRemove(registry);
+            }
+        },
+
         loadRegistries() {
             const requestId = ++this.requestId;
             this.loading = true;
@@ -220,6 +249,7 @@ export default {
                 if (res?.ok) {
                     this.registries = res.registries;
                     this.sources = res.sources || { loginRegistries: [],
+                        managedLogins: [],
                         mirrors: [],
                         configError: "",
                         daemonError: "",
@@ -228,6 +258,7 @@ export default {
                 } else {
                     this.registries = [];
                     this.sources = { loginRegistries: [],
+                        managedLogins: [],
                         mirrors: [],
                         configError: "",
                         daemonError: "" };
@@ -344,8 +375,40 @@ export default {
 .configured-sources h2 { margin-bottom: 4px; }
 .source-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .source-group strong { min-width: 145px; }
-.source-chip { padding: 5px 9px; border-radius: 7px; background: #f1f3f5; overflow-wrap: anywhere; }
+.source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: 7px;
+    background: #f1f3f5;
+    overflow-wrap: anywhere;
+}
 .dark .source-chip { background: $dark-bg2; }
+
+/* Docker Hub is built in: badge, no remove button */
+.source-tag { padding: 1px 6px; border-radius: 5px; background: rgba(0, 0, 0, 0.08); font-size: 11px; opacity: 0.75; }
+.dark .source-tag { background: rgba(255, 255, 255, 0.12); }
+
+.chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font-size: 10px;
+    opacity: 0.55;
+    cursor: pointer;
+}
+.chip-remove:hover { opacity: 1; background: rgba(0, 0, 0, 0.08); }
+.dark .chip-remove:hover { background: rgba(255, 255, 255, 0.14); }
+
+.add-source { padding: 2px 8px; font-size: 12px; }
 
 /* Where the list was read from, so an empty list is diagnosable */
 .source-path { margin-top: 12px; }

@@ -6,6 +6,8 @@ import { log } from "./log";
 
 export interface DockerRegistrySources {
     loginRegistries : string[];
+    /** Entries backed by a registry saved in Dockcg, so they can be removed here. */
+    managedLogins : { id : string; label : string }[];
     mirrors : string[];
     configError : string;
     daemonError : string;
@@ -14,6 +16,9 @@ export interface DockerRegistrySources {
     /** Set when an external credential helper owns the secrets. */
     credsStore : string;
 }
+
+/** Docker Hub is the built-in registry: always listed, never removable. */
+export const DEFAULT_REGISTRY = "docker.io";
 
 function publicEndpoint(value : string) : string {
     try {
@@ -186,9 +191,11 @@ export async function getDockerRegistrySources() : Promise<DockerRegistrySources
     }
 
     const { mirrors, error: daemonError } = await readDaemonMirrors();
+    const names = Array.from(loginRegistries.values()).sort();
 
     return {
-        loginRegistries: Array.from(loginRegistries.values()).sort(),
+        loginRegistries: [ DEFAULT_REGISTRY, ...names.filter((name) => name !== DEFAULT_REGISTRY) ],
+        managedLogins: [],
         mirrors,
         configError,
         daemonError,

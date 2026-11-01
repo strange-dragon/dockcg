@@ -105,7 +105,7 @@ Reverse proxy setups (Caddy / nginx / Traefik, websocket included) are in [docs/
 
 The "Docker sources currently configured" block under `Settings → Registries` is read-only and has exactly two origins:
 
-- **Registry logins** — registries added in Dockcg (credentials are encrypted in `data/dockcg.db` and replayed with `docker login` on every start), plus `auths` / `credHelpers` from the container's own `~/.docker/config.json`.
+- **Registry logins** — registries added in Dockcg (credentials are encrypted in `data/dockcg.db` and replayed with `docker login` on every start), plus `auths` / `credHelpers` from the container's own `~/.docker/config.json`. Sources added in Dockcg can be removed straight from that row; `docker.io` is the built-in default, always first and never removable.
 - **Registry mirrors** — the Docker daemon's `registry-mirrors`, read with `docker info`. Dockcg cannot change them.
 
 Credentials from a `docker login` on the **host** live in the host's `/root/.docker/config.json` and are invisible inside the container. Mount it to reuse them:

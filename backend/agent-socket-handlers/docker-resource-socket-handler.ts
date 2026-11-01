@@ -6,7 +6,7 @@ import { R } from "redbean-node";
 import { Registry } from "../models/registry";
 import { decryptSecret, encryptSecret } from "../secret-box";
 import { dockerExec } from "../docker-cli";
-import { displayRegistryName, getDockerRegistrySources } from "../docker-registry-sources";
+import { DEFAULT_REGISTRY, displayRegistryName, getDockerRegistrySources } from "../docker-registry-sources";
 import { addServiceNetwork, saveServiceNetwork } from "../compose-network-association";
 import { Stack } from "../stack";
 import { realpath } from "node:fs/promises";
@@ -460,16 +460,28 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
 
                 // A registry saved here is logged in by Dockcg itself (and
                 // replayed on every start), so it counts as a login even when
-                // config.json is not visible from inside the container.
-                const known = new Set(sources.loginRegistries);
+                // config.json is not visible from inside the container. Those
+                // entries keep their row id, so the page can remove them.
+                const names = new Set(sources.loginRegistries);
                 for (const registry of list) {
                     const label = displayRegistryName(registry.url);
-                    if (label && !known.has(label)) {
-                        known.add(label);
-                        sources.loginRegistries.push(label);
+                    if (!label) {
+                        continue;
+                    }
+                    names.add(label);
+                    if (!sources.managedLogins.some((item) => item.label === label)) {
+                        sources.managedLogins.push({
+                            id: String(registry.id),
+                            label,
+                        });
                     }
                 }
-                sources.loginRegistries.sort();
+
+                // Docker Hub stays first and is never removable.
+                sources.loginRegistries = [
+                    DEFAULT_REGISTRY,
+                    ...Array.from(names).filter((name) => name !== DEFAULT_REGISTRY).sort(),
+                ];
 
                 callbackResult({
                     ok: true,
