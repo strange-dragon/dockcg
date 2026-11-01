@@ -233,22 +233,8 @@ volumes:
         assert("removing an in-use image is refused", removeImageRes.ok === false, removeImageRes.msg);
     }
 
-    // pre-pull goes through Terminal.exec, so this also covers the progress terminal
-    const pullRes = await agent("pullDockerImage", "hello-world");
-    assert("pre-pull succeeds", pullRes.ok === true, pullRes.msg);
-
-    const afterPull = await agent("getDockerImageList");
-    const pulledImage = (afterPull.images || []).find((image) => image.reference.includes("hello-world"));
-    assert("pulled image shows up in the list", !!pulledImage);
-    assert("pulled image is reported as unused", pulledImage?.used === false, JSON.stringify(pulledImage?.containers));
-
-    if (pulledImage) {
-        const removeUnusedRes = await agent("removeDockerImage", pulledImage.id);
-        assert("removing an unused image succeeds", removeUnusedRes.ok === true, removeUnusedRes.msg);
-        const afterRemove = await agent("getDockerImageList");
-        assert("removed image is gone from the list",
-            !(afterRemove.images || []).some((image) => image.reference.includes("hello-world")));
-    }
+    // The resources section cannot create objects any more: images, volumes and
+    // networks only come from a compose file, so there is no pull to exercise.
 
     // ----------------------------------------------------------------- volumes
     section("volumes");
