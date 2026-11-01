@@ -21,7 +21,7 @@
             <div class="detail-grid">
                 <div class="col">
                     <section>
-                        <h2 class="section-title">{{ $t("containers") }}</h2>
+                        <h2 class="section-title h5">{{ $t("containers") }}</h2>
                         <div class="shadow-box">
                             <div v-for="container in volume.containers" :key="container.id" class="crow">
                                 <div class="crow-main">
@@ -43,7 +43,7 @@
                     </section>
 
                     <section>
-                        <h2 class="section-title">{{ $t("inComposeYaml") }}</h2>
+                        <h2 class="section-title h5">{{ $t("inComposeYaml") }}</h2>
                         <div class="shadow-box">
                             <pre class="snippet">{{ composeSnippet }}</pre>
                             <button class="btn btn-normal btn-sm mt-2" type="button" @click="copy(composeSnippet)">
@@ -55,7 +55,7 @@
 
                 <div class="col">
                     <section>
-                        <h2 class="section-title">{{ $t("details") }}</h2>
+                        <h2 class="section-title h5">{{ $t("details") }}</h2>
                         <div class="shadow-box">
                             <div class="kv-row"><div class="kv-k">{{ $t("name") }}</div><div class="kv-v mono">{{ volume.name }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("driver") }}</div><div class="kv-v">{{ volume.driver }}</div></div>
@@ -237,7 +237,7 @@ export default {
 .snippet {
     margin: 0;
     font-family: "JetBrains Mono", Menlo, monospace;
-    font-size: var(--rd-fs-badge);
+    font-size: var(--rd-fs-small);
     line-height: 1.6;
     color: var(--strong);
     white-space: pre-wrap;
