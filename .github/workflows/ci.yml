@@ -29,7 +29,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      actions: write # docker buildx 的 gha 缓存需要
 
     steps:
       - name: Disable autocrlf
@@ -79,21 +78,14 @@ jobs:
       - name: End-to-end resources test (real caddy stack)
         run: npx tsx extra/test-resources.ts
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # 镜像是自包含的（node:22 + golang 两个官方镜像），不再预拉任何第三方基础镜像
+      # 用 runner 自带的 Docker 直接构建，不走 docker/setup-buildx-action：
+      # 那个 action 启动时要先拉 moby/buildkit，GitHub runner 偶尔会返回
+      # "unauthorized: authentication required"，与本项目无关，却会让冒烟测试
+      # 直接失败。单平台构建用不到 buildx。
       - name: Build image (linux/amd64, no push)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          target: release
-          platforms: linux/amd64
-          load: true
-          tags: dockcg:ci
-          cache-from: type=gha,scope=dockcg
-          cache-to: type=gha,mode=max,scope=dockcg
+        run: |
+          set -euo pipefail
+          docker build --file docker/Dockerfile --target release --tag dockcg:ci .
 
       - name: Smoke test container
         run: |
