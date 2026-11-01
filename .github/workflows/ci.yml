@@ -117,6 +117,22 @@ jobs:
             exit 1
           fi
 
+      # 回归防护：Dockerfile 曾经没有前端构建阶段，镜像能起来但首页空白
+      - name: Assert the image ships the frontend
+        run: |
+          set -euo pipefail
+          docker exec dockcg-ci test -s /app/frontend-dist/index.html
+          body=$(curl -s http://127.0.0.1:5001/)
+          case "$body" in
+            *"<!doctype html"*|*"<!DOCTYPE html"*) ;;
+            *)
+              echo "::error::index.html was not served from the image"
+              echo "$body" | head -20
+              exit 1
+              ;;
+          esac
+          echo "ok: frontend bundle is served from the image"
+
       - name: Assert data dir and registry migration
         run: |
           set -euo pipefail

@@ -42,7 +42,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ github.token }}
+          password: ${{ secrets.GHCR_TOKEN || github.token }}
 
       # 1.5.0 / 1.5 / 1 / latest, derived from the git tag
       - name: Docker metadata
@@ -73,11 +73,12 @@ jobs:
           cache-from: type=gha,scope=dockcg-nightly
           cache-to: type=gha,mode=max,scope=dockcg-release
 
-      # The pushed tags are only half the story: the package also has to be
-      # public, otherwise every `docker pull` asks for credentials.
-      - name: Remind about package visibility
+      # Two things can still make `docker pull` ask for credentials or fail:
+      # the package being private, and the package not granting this repository
+      # write access (seen as `denied: permission_denied: write_package`).
+      - name: Remind about package settings
         run: |
-          echo "::notice title=Check package visibility::https://github.com/users/${{ github.repository_owner }}/packages/container/dockcg/settings — set visibility to Public, or anonymous pulls return 401/denied."
+          echo "::notice title=Package settings::https://github.com/users/${{ github.repository_owner }}/packages/container/dockcg/settings — visibility Public, and Manage Actions access -> this repo = Write."
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
