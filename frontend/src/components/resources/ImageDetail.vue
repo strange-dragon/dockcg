@@ -22,7 +22,7 @@
             <div class="detail-grid">
                 <div class="col">
                     <section>
-                        <h2 class="section-title">{{ $t("containers") }}</h2>
+                        <h2 class="section-title h5">{{ $t("containers") }}</h2>
                         <div class="shadow-box">
                             <div v-for="container in image.containers" :key="container.id" class="crow">
                                 <div class="crow-main">
@@ -44,7 +44,7 @@
                     </section>
 
                     <section>
-                        <h2 class="section-title">{{ $t("tags") }}</h2>
+                        <h2 class="section-title h5">{{ $t("tags") }}</h2>
                         <div class="shadow-box">
                             <span v-for="tagName in siblingTags" :key="tagName" class="chip">{{ tagName }}</span>
                             <span v-if="siblingTags.length === 0" class="chip">&lt;none&gt;</span>
@@ -54,7 +54,7 @@
 
                 <div class="col">
                     <section>
-                        <h2 class="section-title">{{ $t("details") }}</h2>
+                        <h2 class="section-title h5">{{ $t("details") }}</h2>
                         <div class="shadow-box">
                             <div class="kv-row"><div class="kv-k">{{ $t("size") }}</div><div class="kv-v">{{ formatBytes(image.size) }}</div></div>
                             <div class="kv-row"><div class="kv-k">{{ $t("imageID") }}</div><div class="kv-v mono">sha256:{{ image.shortID }}</div></div>
