@@ -4,17 +4,19 @@
  * section — sidebar, overview and detail pages all key off these values, so a
  * heading or a row cannot pick a different size on a different page.
  *
+ * The type scale itself is not redefined here. Headings and body text take
+ * their size from the tags and classes Dockge already uses — `h1` (32px),
+ * `.h5` (20px), plain body (16px) — and badges keep Bootstrap's `.badge`.
+ * Only the one tier Bootstrap has no utility for, secondary text, gets a
+ * variable, and it is exactly Bootstrap's `.small`.
+ *
  * Dark theme overrides live here too, which is why the pages do not carry
  * their own `.dark` rules anymore.
  */
 .resource-detail,
 .resource-sidebar {
-    /* type scale — five steps, nothing in between */
-    --rd-fs-title: 1.5rem;      /* 24px — page / resource name */
-    --rd-fs-section: 1.125rem;  /* 18px — section heading */
-    --rd-fs-body: 1rem;         /* 16px — primary row */
-    --rd-fs-small: 0.875rem;    /* 14px — secondary row, key/value */
-    --rd-fs-badge: 0.75rem;     /* 12px — badge, chip, code */
+    /* secondary text — identical to Bootstrap `.small` */
+    --rd-fs-small: 0.875rem;
 
     /* spacing — 4px grid */
     --rd-1: 4px;
