@@ -340,12 +340,12 @@
         "dead": "已失效"
     },
     "networkRelations": "网络关联",
-    "networkRelationHint": "选择其他网络中的服务，在其 Compose 文件中添加当前网络。",
-    "availableContainers": "其他网络中的容器",
-    "dragContainerHint": "拖动 Dockcg 管理的 Compose 服务以预览 YAML 修改。",
-    "noAvailableContainers": "没有找到其他容器。",
+    "networkRelationHint": "从左侧把 Compose 服务拖到网络上，或点 +。网络会写入该堆栈的 compose.yaml。",
+    "availableContainers": "可加入的 Compose 服务",
+    "dragContainerHint": "拖到右侧网络，或点 + 加入。",
+    "noAvailableContainers": "所有 Compose 服务都已接入此网络。",
     "connectToNetwork": "接入网络",
-    "dropContainerHint": "将服务拖到这里预览 Compose 修改。",
+    "dropContainerHint": "把服务拖到这里，即可写入它的 Compose 文件。",
     "runtimeNetworkWarning": "此操作会立即修改 Docker 中的连接。若容器由 Compose 管理，还需在 compose.yaml 中声明该网络，重建后才能保留。",
     "configuredDockerSources": "当前 Docker 源",
     "configuredDockerSourcesHint": "仓库登录源名称来自 Dockcg 可访问的 Docker 配置（要显示宿主机登录源，需挂载宿主机配置）；镜像加速源来自 Docker 守护进程。不会显示凭据。",
@@ -398,5 +398,6 @@
     "stoppedContainer": "已停止",
     "overview": "概览",
     "unmanaged": "未托管",
-    "noStacks": "还没有堆栈。"
+    "noStacks": "还没有堆栈。",
+    "addStack": "添加堆栈"
 }

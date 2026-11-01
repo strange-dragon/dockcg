@@ -6,69 +6,66 @@
             </option>
         </select>
 
-        <!-- One row of top-level lists. Containers are not one of them: a stack
-             owns its containers, so they live under their stack below. -->
-        <div class="seg">
-            <button
-                v-for="tab in tabs" :key="tab.key" class="seg-item"
-                :class="{ active: activeTab === tab.key }" type="button"
-                @click="go(tab.key)"
-            >
-                {{ $t(tab.label) }}
-            </button>
-        </div>
-
-        <div class="panel">
+        <div class="shadow-box panel">
+            <!-- Creating a stack is the only write action, so it keeps the space.
+                 Search is a small icon and only expands when it is used. -->
             <div class="panel-head">
-                <div class="search">
+                <template v-if="!searchOpen">
+                    <router-link v-if="view === 'stacks'" to="/compose" class="add-btn" :title="$t('addStack')">
+                        <font-awesome-icon icon="plus" />
+                        <span>{{ $t("addStack") }}</span>
+                    </router-link>
+                    <div v-else class="head-spacer"></div>
+
+                    <button class="icon-btn" type="button" :title="$t('search')" @click="openSearch">
+                        <font-awesome-icon icon="search" />
+                    </button>
+                </template>
+
+                <div v-else class="search">
                     <font-awesome-icon icon="search" class="search-icon" />
                     <input
-                        v-model="search" class="search-input" type="search"
+                        ref="searchInput" v-model="search" class="search-input" type="search"
                         :placeholder="searchPlaceholder" autocomplete="off"
+                        @keydown.esc="closeSearch"
                     />
-                    <button v-if="search !== ''" class="search-clear" type="button" :title="$t('cancel')" @click="search = ''">
+                    <button class="search-clear" type="button" :title="$t('cancel')" @click="closeSearch">
                         <font-awesome-icon icon="times" />
                     </button>
                 </div>
-
-                <!-- New stacks still start from a compose file; resource lists are read-only -->
-                <button
-                    v-if="activeTab === 'stacks' || activeTab === 'overview'" class="icon-btn"
-                    type="button" :title="$t('compose')" @click="$router.push('/compose')"
-                >
-                    <font-awesome-icon icon="plus" />
-                </button>
             </div>
 
             <div class="panel-body">
-                <!-- STACKS: a stack is a compose project, so its containers are its children -->
-                <template v-if="activeTab === 'stacks' || activeTab === 'overview'">
+                <!-- STACKS: Dockge's list. A stack owns its containers, so they
+                     open underneath it instead of getting their own top level. -->
+                <template v-if="view === 'stacks'">
                     <div v-for="(group, index) in stackGroups" :key="group.endpoint" class="stack-group">
                         <div v-if="hasMultipleEndpoints" class="group-label" :class="{ separated: index > 0 }">{{ group.label }}</div>
 
                         <template v-for="stack in group.stacks" :key="stackKey(stack)">
-                            <div class="row stack-row" :class="{ sel: isCurrentStack(stack) }">
+                            <div class="item" :class="{ active: isCurrentStack(stack), dim: !stack.isManagedByDockcg }">
+                                <router-link :to="stackUrl(stack)" class="item-link">
+                                    <Uptime :stack="stack" :fixed-width="true" />
+                                    <span class="title">{{ stack.name }}</span>
+                                </router-link>
                                 <button
+                                    v-if="containerCount(stack) > 0"
                                     class="caret" :class="{ open: isOpen(stack) }" type="button"
-                                    :title="$t('containers')" @click="toggle(stack)"
+                                    :title="$t('containers')" @click.stop="toggle(stack)"
                                 >
                                     <font-awesome-icon icon="chevron-down" />
                                 </button>
-                                <router-link :to="stackUrl(stack)" class="row-name">{{ stack.name }}</router-link>
-                                <span v-if="containerCount(stack) > 0" class="row-count">{{ containerCount(stack) }}</span>
-                                <Uptime :stack="stack" />
                             </div>
 
                             <div v-if="isOpen(stack)" class="children">
                                 <button
-                                    v-for="container in containersOf(stack)" :key="container.id" class="row child"
+                                    v-for="container in containersOf(stack)" :key="container.id" class="child"
                                     :class="{ sel: container.id === selectedContainerId }" type="button"
                                     :title="`${container.image} · ${container.state}`" @click="openContainer(container)"
                                 >
                                     <span class="dot" :class="{ on: container.state === 'running' }"></span>
-                                    <span class="row-name">{{ container.service || container.name }}</span>
+                                    <span class="child-name">{{ container.service || container.name }}</span>
                                 </button>
-                                <div v-if="containersOf(stack).length === 0" class="hint">{{ $t("noResources") }}</div>
                             </div>
                         </template>
                     </div>
@@ -83,12 +80,12 @@
                             {{ $t("unmanaged") }} <span class="row-count">{{ unmanaged.length }}</span>
                         </div>
                         <button
-                            v-for="container in unmanaged" :key="container.id" class="row child"
+                            v-for="container in unmanaged" :key="container.id" class="child"
                             :class="{ sel: container.id === selectedContainerId }" type="button"
                             :title="`${container.image} · ${container.state}`" @click="openContainer(container)"
                         >
                             <span class="dot" :class="{ on: container.state === 'running' }"></span>
-                            <span class="row-name">{{ container.name }}</span>
+                            <span class="child-name">{{ container.name }}</span>
                         </button>
                     </div>
                 </template>
@@ -96,12 +93,12 @@
                 <!-- IMAGES / VOLUMES / NETWORKS -->
                 <template v-else>
                     <button
-                        v-for="row in loading || loadError ? [] : rows" :key="row.key" class="row resource-row"
+                        v-for="row in loading || loadError ? [] : rows" :key="row.key" class="res-row"
                         :class="{ sel: row.key === selectedKey }" type="button"
                         @click="openRow(row)"
                     >
                         <span class="badge" :class="row.badgeClass">{{ $t(row.badge) }}</span>
-                        <span class="row-name">{{ row.label }}<span v-if="row.tag" class="tag">{{ row.tag }}</span></span>
+                        <span class="res-name">{{ row.label }}<span v-if="row.tag" class="tag">{{ row.tag }}</span></span>
                     </button>
 
                     <div v-if="loading" class="empty" role="status">{{ $t("loadingResources") }}</div>
@@ -110,10 +107,18 @@
                 </template>
             </div>
 
+            <!-- Dockge's list stays the main content; the resource lists sit at
+                 the bottom and simply replace it, one tab highlighted at a time. -->
             <div class="panel-foot">
-                <router-link to="/resources" class="foot-link" :class="{ active: activeTab === 'overview' }">
-                    {{ $t("overview") }}
-                </router-link>
+                <div class="seg">
+                    <button
+                        v-for="tab in tabs" :key="tab.key" class="seg-item"
+                        :class="{ active: view === tab.key }" type="button"
+                        @click="setView(tab.key)"
+                    >
+                        {{ $t(tab.label) }}
+                    </button>
+                </div>
                 <button class="foot-refresh" type="button" :disabled="loading" :title="$t('refresh')" @click="refresh">
                     <font-awesome-icon icon="arrows-rotate" :spin="loading" />
                 </button>
@@ -173,7 +178,10 @@ export default {
     data() {
         return {
             tabs: TABS,
+            /** Which list the panel shows. Switching never leaves the page. */
+            view: "stacks",
             search: "",
+            searchOpen: false,
             loading: false,
             loadError: "",
             requestId: 0,
@@ -186,26 +194,8 @@ export default {
     },
 
     computed: {
-        activeTab() {
-            const path = this.$route.path;
-
-            if (path.startsWith("/resources/images")) {
-                return "images";
-            }
-            if (path.startsWith("/resources/volumes")) {
-                return "volumes";
-            }
-            if (path.startsWith("/resources/networks")) {
-                return "networks";
-            }
-            if (path === "/resources") {
-                return "overview";
-            }
-            return "stacks";
-        },
-
         searchPlaceholder() {
-            if (this.activeTab === "stacks" || this.activeTab === "overview") {
+            if (this.view === "stacks") {
                 return `${this.$t("search")} — ${this.$t("stacks")} / ${this.$t("containers")}`;
             }
             return this.$t("search");
@@ -303,7 +293,7 @@ export default {
             const keyword = this.search.trim().toLowerCase();
             const match = (text) => !keyword || String(text).toLowerCase().includes(keyword);
 
-            if (this.activeTab === "images") {
+            if (this.view === "images") {
                 return this.images
                     .filter((image) => match(`${image.repository}:${image.tag}`) || match(image.shortID))
                     .map((image) => ({
@@ -317,7 +307,7 @@ export default {
                     }));
             }
 
-            if (this.activeTab === "volumes") {
+            if (this.view === "volumes") {
                 return this.volumes
                     .filter((volume) => match(volume.name))
                     .map((volume) => ({
@@ -331,7 +321,7 @@ export default {
                     }));
             }
 
-            if (this.activeTab === "networks") {
+            if (this.view === "networks") {
                 return this.networks
                     .filter((network) => match(network.name))
                     .map((network) => ({
@@ -350,10 +340,6 @@ export default {
     },
 
     watch: {
-        activeTab() {
-            this.search = "";
-            this.refresh();
-        },
         endpoint() {
             this.refresh();
         },
@@ -376,12 +362,27 @@ export default {
     },
 
     methods: {
-        go(tab) {
-            if (tab === "stacks") {
-                this.$router.push("/");
-            } else {
-                this.$router.push(`/resources/${tab}`);
+        /** Collapse the stack list and show one resource list in its place. */
+        setView(view) {
+            if (this.view === view) {
+                return;
             }
+            this.view = view;
+            this.search = "";
+            this.searchOpen = false;
+            this.refresh();
+        },
+
+        openSearch() {
+            this.searchOpen = true;
+            this.$nextTick(() => {
+                this.$refs.searchInput?.focus();
+            });
+        },
+
+        closeSearch() {
+            this.search = "";
+            this.searchOpen = false;
         },
 
         stackKey(stack) {
@@ -461,21 +462,21 @@ export default {
             this.loadError = "";
             this.loading = true;
 
-            if (this.activeTab === "images") {
+            if (this.view === "images") {
                 this.$root.emitAgent(this.endpoint, "getDockerImageList", (res) => done(res, (r) => {
                     this.images = r.images;
                 }));
                 return;
             }
 
-            if (this.activeTab === "volumes") {
+            if (this.view === "volumes") {
                 this.$root.emitAgent(this.endpoint, "getDockerVolumeList", (res) => done(res, (r) => {
                     this.volumes = r.volumes;
                 }));
                 return;
             }
 
-            if (this.activeTab === "networks") {
+            if (this.view === "networks") {
                 this.$root.emitAgent(this.endpoint, "getDockerNetworkResourceList", (res) => done(res, (r) => {
                     this.networks = r.networks;
                 }));
@@ -501,72 +502,18 @@ export default {
     gap: var(--rd-2);
 }
 
-/* Top-level lists: one quiet track, one filled pill. Never wraps. */
-.seg {
-    display: flex;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--rd-radius);
-    background: #eceff3;
-
-    .dark & {
-        background: $dark-header-bg;
-    }
-}
-
-.seg-item {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 6px 4px;
-    border: 0;
-    border-radius: var(--rd-radius-sm);
-    background: transparent;
-    color: #5c6773;
-    font-size: var(--rd-fs-small);
-    line-height: 1.25;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    cursor: pointer;
-    transition: background 0.1s ease-in-out, color 0.1s ease-in-out;
-
-    &:hover {
-        color: #111;
-        background: rgba(0, 0, 0, 0.04);
-    }
-
-    .dark & {
-        color: $dark-font-color;
-    }
-
-    .dark &:hover {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.04);
-    }
-
-    &.active {
-        background: $primary;
-        color: #0b1a26;
-        font-weight: 600;
-
-        .dark & {
-            background: $primary;
-            color: #071a27;
-        }
-    }
-}
-
+/* Dockge's card: shadow-box supplies the shadow and radius, the panel only
+   takes its padding back so the three sections can sit flush. */
 .panel {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    height: calc(100vh - 190px);
+    height: calc(100vh - 160px);
+    padding: 0;
     position: sticky;
     top: 10px;
-    border: 1px solid var(--card-border);
-    border-radius: var(--rd-radius);
-    background: #fff;
     overflow: hidden;
+    background: var(--card-bg);
 
     .dark & {
         background: $dark-bg;
@@ -579,9 +526,81 @@ export default {
     gap: var(--rd-2);
     padding: var(--rd-2);
     border-bottom: 1px solid var(--card-border);
+}
+
+/* The one write action, so it reads as the primary button of the panel */
+.add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: var(--rd-radius-sm);
+    background: $primary-gradient;
+    color: #08202e;
+    font-size: var(--rd-fs-small);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: filter 0.1s ease-in-out;
 
     .dark & {
-        background: $dark-header-bg;
+        color: $dark-font-color2;
+    }
+
+    &:hover {
+        filter: brightness(1.06);
+        color: #08202e;
+
+        .dark & {
+            color: $dark-font-color2;
+        }
+    }
+
+    svg {
+        font-size: 12px;
+        flex: 0 0 auto;
+    }
+
+    span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+.head-spacer {
+    flex: 1 1 auto;
+}
+
+/* Search is a 30px icon; it only shows the input once it is used */
+.icon-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--rd-radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s ease-in-out, color 0.1s ease-in-out;
+
+    &:hover {
+        color: var(--strong);
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .dark &:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.06);
     }
 }
 
@@ -652,27 +671,6 @@ export default {
     }
 }
 
-.icon-btn {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--rd-radius-sm);
-    background: $primary;
-    color: #08202e;
-    font-size: 13px;
-    cursor: pointer;
-    transition: filter 0.1s ease-in-out;
-
-    &:hover {
-        filter: brightness(1.08);
-    }
-}
-
 .panel-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -680,68 +678,60 @@ export default {
     overflow-y: auto;
 }
 
-.row {
+/* Dockge's StackListItem geometry: badge left, name right, one single line.
+   (.row is a Bootstrap class — its > * rule forces width: 100% and wraps.) */
+.item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 2px;
     width: 100%;
-    padding: 5px 6px;
-    border: 0;
-    border-radius: var(--rd-radius-sm);
-    background: transparent;
-    color: inherit;
-    text-align: left;
-    font-size: var(--rd-fs-small);
-    line-height: 1.4;
-    cursor: pointer;
-    transition: background 0.1s ease-in-out;
+    min-height: 52px;
+    padding: 5px 8px;
+    border-radius: var(--rd-radius);
+    transition: background 0.15s ease-in-out;
 
     &:hover {
-        background: var(--panel-bg);
+        background: $highlight-white;
     }
 
     .dark &:hover {
         background: $dark-header-bg;
     }
 
-    &.sel {
+    &.active {
         background: rgba($primary, 0.18);
 
         .dark & {
             background: rgba($primary, 0.14);
         }
     }
-}
 
-.row-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.stack-row .row-name {
-    color: inherit;
-    text-decoration: none;
-    font-weight: 500;
-
-    &:hover {
-        color: $primary;
+    &.dim .title {
+        opacity: 0.5;
     }
 }
 
-.row-count {
-    flex: 0 0 auto;
-    color: var(--dim);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
+.item-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+        color: inherit;
+    }
 }
 
-.stack-row .badge {
-    flex: 0 0 auto;
-    min-width: 56px;
-    font-weight: 500;
+.title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-top: -4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .caret {
@@ -749,11 +739,11 @@ export default {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     padding: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: 6px;
     background: transparent;
     color: var(--dim);
     font-size: 10px;
@@ -770,7 +760,7 @@ export default {
 
     &:hover {
         color: var(--strong);
-        background: var(--panel-bg);
+        background: rgba(0, 0, 0, 0.05);
 
         .dark & {
             background: $dark-bg2;
@@ -779,12 +769,47 @@ export default {
 }
 
 .children {
-    padding-left: 18px;
+    padding-bottom: 4px;
 }
 
 .child {
-    padding-left: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 30px;
+    padding: 0 8px 0 34px;
+    border: 0;
+    border-radius: var(--rd-radius-sm);
+    background: transparent;
     color: var(--muted);
+    font-size: var(--rd-fs-small);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+        background: $highlight-white;
+        color: var(--strong);
+    }
+
+    .dark &:hover {
+        background: $dark-header-bg;
+    }
+
+    &.sel {
+        background: rgba($primary, 0.18);
+
+        .dark & {
+            background: rgba($primary, 0.14);
+        }
+    }
+}
+
+.child-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .dot {
@@ -814,17 +839,58 @@ export default {
     }
 }
 
-.hint {
-    padding: 2px 6px 6px;
+.row-count {
     color: var(--dim);
     font-size: 12px;
+    font-variant-numeric: tabular-nums;
 }
 
-.resource-row .badge {
+/* IMAGES / VOLUMES / NETWORKS: badge + name, still one line */
+.res-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 36px;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: var(--rd-radius-sm);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+        background: $highlight-white;
+    }
+
+    .dark &:hover {
+        background: $dark-header-bg;
+    }
+
+    &.sel {
+        background: rgba($primary, 0.18);
+
+        .dark & {
+            background: rgba($primary, 0.14);
+        }
+    }
+}
+
+.res-row .badge {
     flex: 0 0 auto;
+    min-width: 62px;
 }
 
-.resource-row .tag {
+.res-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.res-name .tag {
     color: var(--muted);
 }
 
@@ -839,37 +905,78 @@ export default {
     }
 }
 
+/* Footer: Dockge's list is the default tab, the resource lists sit next to it */
 .panel-foot {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 4px var(--rd-2);
+    gap: var(--rd-2);
+    padding: var(--rd-2);
     border-top: 1px solid var(--card-border);
+}
+
+.seg {
+    display: flex;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 2px;
+    border-radius: var(--rd-radius-sm);
+    background: #eceff3;
 
     .dark & {
         background: $dark-header-bg;
     }
 }
 
-.foot-link {
-    padding: 3px 6px;
-    border-radius: var(--rd-radius-sm);
-    color: var(--muted);
-    font-size: var(--rd-fs-small);
-    text-decoration: none;
+.seg-item {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 5px 2px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #5c6773;
+    font-size: 13px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background 0.1s ease-in-out, color 0.1s ease-in-out;
 
-    &:hover,
+    &:hover {
+        color: #111;
+        background: rgba(0, 0, 0, 0.04);
+    }
+
+    .dark & {
+        color: $dark-font-color;
+    }
+
+    .dark &:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.04);
+    }
+
     &.active {
-        color: $primary;
+        background: $primary;
+        color: #0b1a26;
+        font-weight: 600;
+
+        .dark & {
+            background: $primary;
+            color: #071a27;
+        }
     }
 }
 
 .foot-refresh {
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     border: 0;
     border-radius: var(--rd-radius-sm);

@@ -340,12 +340,12 @@
         "dead": "Dead"
     },
     "networkRelations": "Network relationships",
-    "networkRelationHint": "Choose services from other networks to add this network to their Compose files.",
-    "availableContainers": "Containers on other networks",
-    "dragContainerHint": "Drag a managed Compose service to preview its YAML change.",
-    "noAvailableContainers": "No other containers found.",
+    "networkRelationHint": "Pick a Compose service on the left and drop it on the network, or press +. The network is written into that stack's compose.yaml.",
+    "availableContainers": "Compose services",
+    "dragContainerHint": "Drag onto the network, or press +.",
+    "noAvailableContainers": "Every Compose service is already on this network.",
     "connectToNetwork": "Connect to network",
-    "dropContainerHint": "Drop a service here to preview its Compose change.",
+    "dropContainerHint": "Drop a service here to add this network to its Compose file.",
     "runtimeNetworkWarning": "This changes the running Docker connection. For Compose-managed containers, also add the network to compose.yaml so the connection survives recreation.",
     "configuredDockerSources": "Docker sources currently configured",
     "configuredDockerSourcesHint": "Registry login names come from Docker config visible to Dockcg (mount the host config to show host logins); mirrors come from the Docker daemon. Credentials are never shown.",
@@ -398,5 +398,6 @@
     "stoppedContainer": "Stopped",
     "overview": "Overview",
     "unmanaged": "Unmanaged",
-    "noStacks": "No stacks yet."
+    "noStacks": "No stacks yet.",
+    "addStack": "Add Stack"
 }

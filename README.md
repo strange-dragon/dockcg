@@ -23,7 +23,7 @@ New in this fork, on top of an otherwise unchanged compose workflow:
 - **Registries** — Docker Hub / ghcr.io / Harbor credentials, `docker login` in the background, password encrypted at rest.
 - **Overview** — one page with counts and previewed cleanup for all four resource types.
 
-The sidebar is one list with one search box: stacks / images / volumes / networks at the top, and a stack expands into its containers.
+The sidebar is Dockge's stack list: expand a stack to see its containers. Images / volumes / networks live in the segmented switch at the bottom of the list; picking one replaces the stack list in place instead of navigating away.
 
 Nothing here creates an image, volume or network: **new objects only ever come from a compose file**, and the resources section can inspect, edit the compose file or delete — never add.
 

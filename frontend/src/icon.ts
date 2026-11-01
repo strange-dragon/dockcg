@@ -63,6 +63,7 @@ import {
     faRightLeft,
     faCodeBranch,
     faShareNodes,
+    faGripVertical,
     faCircleInfo,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -128,6 +129,7 @@ library.add(
     faRightLeft,
     faCodeBranch,
     faShareNodes,
+    faGripVertical,
     faCircleInfo,
 );
 

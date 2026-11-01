@@ -214,8 +214,11 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                 checkLogin(socket);
                 const containers = await listContainers();
                 const networks = await listNetworks(containers);
+                // The network detail page builds its "add a container" list from
+                // these, so it does not have to ask for them separately.
                 callbackResult({ ok: true,
-                    networks }, callback);
+                    networks,
+                    containers }, callback);
             } catch (e) {
                 callbackError(e, callback);
             }

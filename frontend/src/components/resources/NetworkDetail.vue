@@ -1,5 +1,5 @@
 <template>
-    <div class="resource-detail">
+    <div class="resource-detail network-detail">
         <template v-if="network">
             <div class="detail-head">
                 <span class="badge" :class="stateClass">{{ $t(stateLabel) }}</span>
@@ -10,7 +10,7 @@
                 <button class="btn btn-normal" :disabled="busy || mergeCandidates.length === 0" @click="showMerge = true">
                     <font-awesome-icon icon="code-branch" /> {{ $t("mergeNetworks") }}
                 </button>
-                <button class="btn btn-primary" :disabled="busy" @click="showSnippet = true">
+                <button class="btn btn-normal" :disabled="busy" @click="showSnippet = true">
                     <font-awesome-icon icon="share-nodes" /> {{ $t("shareAcrossStacks") }}
                 </button>
                 <button class="btn btn-normal" :disabled="busy" @click="load">
@@ -25,82 +25,88 @@
             <section class="relation-section">
                 <h2 class="section-title h5">{{ $t("networkRelations") }}</h2>
                 <p class="note">{{ $t("networkRelationHint") }}</p>
-                <div class="relation-grid">
-                    <div class="shadow-box relation-panel">
-                        <h3 class="h5">{{ $t("availableContainers") }}</h3>
-                        <p class="relation-help">{{ $t("dragContainerHint") }}</p>
-                        <div v-if="availableContainers.length === 0" class="relation-empty">{{ $t("noAvailableContainers") }}</div>
-                        <div v-for="entry in availableContainers" :key="entry.id" class="relation-container" draggable="true" @dragstart="onDragStart($event, entry)" @dragend="onDragEnd">
-                            <div class="relation-name">{{ entry.name }}</div>
-                            <div class="relation-sub">{{ entry.source }}<span v-if="entry.stack"> · {{ entry.stack }}</span></div>
-                            <button class="btn btn-sm btn-outline-primary" type="button" :disabled="busy || network.builtIn" @click="entry.stack && entry.service ? connectContainer(entry.id) : showSnippet = true">
-                                {{ $t(entry.stack && entry.service ? "previewComposeChange" : "viewComposeSnippet") }}
-                            </button>
+
+                <div class="rel-grid">
+                    <!-- Drag a service from here onto the network, or press + -->
+                    <div class="shadow-box rel-panel">
+                        <div class="rel-head">
+                            <span class="rel-title">{{ $t("availableContainers") }}</span>
+                            <span class="rel-count">{{ availableContainers.length }}</span>
+                        </div>
+                        <div class="rel-list">
+                            <div
+                                v-for="entry in availableContainers" :key="entry.id" class="rel-item"
+                                :class="{ disabled: network.builtIn }" :draggable="!network.builtIn"
+                                :title="network.builtIn ? $t('builtInNetworkMsg') : $t('dragContainerHint')"
+                                @dragstart="onDragStart($event, entry)" @dragend="onDragEnd"
+                            >
+                                <font-awesome-icon icon="grip-vertical" class="rel-grip" />
+                                <div class="rel-main">
+                                    <div class="rel-name">{{ entry.name }}</div>
+                                    <div class="rel-sub">{{ entry.stack }} / {{ entry.service }}</div>
+                                </div>
+                                <button
+                                    class="rel-add" type="button" :disabled="busy || network.builtIn"
+                                    :title="$t('add')" @click="connectContainer(entry.id)"
+                                >
+                                    <font-awesome-icon icon="plus" />
+                                </button>
+                            </div>
+                            <div v-if="availableContainers.length === 0" class="rel-empty">{{ $t("noAvailableContainers") }}</div>
                         </div>
                     </div>
-                    <div class="shadow-box relation-panel relation-target" :class="{ 'drag-over': dragOver && !network.builtIn }" @dragover.prevent="onDragOver" @dragleave="dragOver = false" @drop.prevent="onDrop">
-                        <h3 class="h5">{{ network.name }}</h3>
-                        <p class="relation-help">{{ $t(network.builtIn ? "builtInNetworkMsg" : "dropContainerHint") }}</p>
-                        <div v-if="network.containers.length === 0" class="relation-empty">{{ $t("noContainerUsesNetwork") }}</div>
-                        <div v-for="container in network.containers" :key="container.id" class="relation-container attached">
-                            <div class="relation-name">{{ container.name }}</div>
-                            <div class="relation-sub">{{ container.stack || $t("noStack") }}<span v-if="container.service"> / {{ container.service }}</span></div>
+
+                    <!-- Drop target: everything currently attached -->
+                    <div
+                        class="shadow-box rel-panel rel-target" :class="{ 'drag-over': dragOver && !network.builtIn }"
+                        @dragover.prevent="onDragOver" @dragleave="dragOver = false" @drop.prevent="onDrop"
+                    >
+                        <div class="rel-head">
+                            <span class="rel-title">{{ network.name }}</span>
+                            <span class="rel-count">{{ network.containers.length }}</span>
                         </div>
+                        <div class="rel-list">
+                            <div v-for="container in network.containers" :key="container.id" class="rel-item attached">
+                                <span class="dot" :class="{ on: container.state === 'running' }"></span>
+                                <div class="rel-main">
+                                    <div class="rel-name">{{ container.name }}</div>
+                                    <div class="rel-sub">
+                                        <template v-if="container.stack">{{ container.stack }}<span v-if="container.service"> / {{ container.service }}</span></template>
+                                        <template v-else>{{ $t("unmanaged") }}</template>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="network.containers.length === 0" class="rel-empty">{{ $t("noContainerUsesNetwork") }}</div>
+                        </div>
+                        <div class="rel-foot">{{ $t(network.builtIn ? "builtInNetworkMsg" : "dropContainerHint") }}</div>
                     </div>
                 </div>
+
                 <p class="relation-warning">{{ $t("networkAutoComposeHint") }}</p>
                 <p v-if="lastConnection !== null" class="relation-warning text-success">
                     {{ $t("networkComposeSynced") }}
                 </p>
             </section>
 
-            <div class="detail-grid">
-                <div class="col">
-                    <section>
-                        <h2 class="section-title h5">{{ $t("connectedContainers") }}</h2>
-                        <div class="shadow-box">
-                            <div v-for="container in network.containers" :key="container.id" class="crow">
-                                <div class="crow-main">
-                                    <div class="crow-name">{{ container.name }}</div>
-                                    <div class="crow-sub">
-                                        <span v-if="container.stack">{{ container.stack }}</span>
-                                        <span v-if="container.stack && container.service"> / </span>
-                                        <span v-if="container.service">{{ container.service }}</span>
-                                    </div>
-                                </div>
-                                <div class="crow-right">
-                                    <span class="badge" :class="container.state === 'running' ? 'bg-primary' : 'bg-secondary'">{{ $te(`dockerState.${container.state}`) ? $t(`dockerState.${container.state}`) : container.state }}</span>
-                                </div>
-                            </div>
-                            <div v-if="network.containers.length === 0" class="crow">
-                                <div class="crow-sub">{{ $t("noContainerUsesNetwork") }}</div>
-                            </div>
+            <section>
+                <h2 class="section-title h5">{{ $t("details") }}</h2>
+                <div class="shadow-box kv-grid">
+                    <div class="kv-row"><div class="kv-k">{{ $t("driver") }}</div><div class="kv-v">{{ network.driver }}</div></div>
+                    <div class="kv-row"><div class="kv-k">{{ $t("subnet") }}</div><div class="kv-v mono">{{ network.subnet || "-" }}</div></div>
+                    <div class="kv-row"><div class="kv-k">{{ $t("scope") }}</div><div class="kv-v">{{ network.scope }}</div></div>
+                    <div class="kv-row"><div class="kv-k">{{ $t("internal") }}</div><div class="kv-v">{{ network.internal ? $t("yes") : $t("no") }}</div></div>
+                    <div class="kv-row">
+                        <div class="kv-k">{{ $t("composeProject") }}</div>
+                        <div class="kv-v">
+                            <template v-if="network.stack">
+                                {{ network.stack }} <span v-if="network.composeNetwork" class="muted">/ {{ $t("network") }}: {{ network.composeNetwork }}</span>
+                            </template>
+                            <template v-else>-</template>
                         </div>
-                    </section>
+                    </div>
+                    <div class="kv-row"><div class="kv-k">{{ $t("networkID") }}</div><div class="kv-v mono">{{ network.id }}</div></div>
                 </div>
-
-                <div class="col">
-                    <section>
-                        <h2 class="section-title h5">{{ $t("details") }}</h2>
-                        <div class="shadow-box">
-                            <div class="kv-row"><div class="kv-k">{{ $t("driver") }}</div><div class="kv-v">{{ network.driver }}</div></div>
-                            <div class="kv-row"><div class="kv-k">{{ $t("subnet") }}</div><div class="kv-v mono">{{ network.subnet || "-" }}</div></div>
-                            <div class="kv-row"><div class="kv-k">{{ $t("scope") }}</div><div class="kv-v">{{ network.scope }}</div></div>
-                            <div class="kv-row"><div class="kv-k">{{ $t("internal") }}</div><div class="kv-v">{{ network.internal ? $t("yes") : $t("no") }}</div></div>
-                            <div class="kv-row">
-                                <div class="kv-k">{{ $t("composeProject") }}</div>
-                                <div class="kv-v">
-                                    <template v-if="network.stack">
-                                        {{ network.stack }} <span v-if="network.composeNetwork" class="muted">/ {{ $t("network") }}: {{ network.composeNetwork }}</span>
-                                    </template>
-                                    <template v-else>-</template>
-                                </div>
-                            </div>
-                            <div class="kv-row"><div class="kv-k">{{ $t("networkID") }}</div><div class="kv-v mono">{{ network.id }}</div></div>
-                        </div>
-                    </section>
-                </div>
-            </div>
+            </section>
         </template>
 
         <div v-else-if="!loading" class="empty-state">{{ $t("selectNetworkHint") }}</div>
@@ -159,6 +165,7 @@ export default {
     data() {
         return {
             networks: [],
+            containers: [],
             loading: false,
             requestId: 0,
             busy: false,
@@ -226,27 +233,38 @@ export default {
             return this.networks.filter((item) => item.name !== this.network.name && !item.builtIn && item.used);
         },
 
+        /**
+         * Services that can be moved onto this network: every Compose service
+         * that is not attached yet. Plain `docker run` containers are hidden on
+         * purpose — only a Compose file can record the change.
+         */
         availableContainers() {
             if (!this.network) {
                 return [];
             }
 
-            const attached = new Set(this.network.containers.map((container) => container.id));
-            const available = new Map();
+            const attached = this.network.containers.map((container) => container.id);
+            const isAttached = (id) => attached.some((item) => item === id || id.startsWith(item) || item.startsWith(id));
+            const seen = new Set();
+            const list = [];
 
-            for (const network of this.networks) {
-                if (network.name === this.network.name) {
+            for (const container of this.containers) {
+                if (!container.stack || !container.service) {
                     continue;
                 }
-                for (const container of network.containers) {
-                    if (!attached.has(container.id) && !available.has(container.id)) {
-                        available.set(container.id, { ...container,
-                            source: network.name });
-                    }
+                if (isAttached(container.id) || seen.has(container.id.substring(0, 12))) {
+                    continue;
                 }
+                seen.add(container.id.substring(0, 12));
+                list.push({
+                    id: container.id,
+                    name: container.name,
+                    stack: container.stack,
+                    service: container.service,
+                });
             }
 
-            return Array.from(available.values()).sort((a, b) => a.name.localeCompare(b.name));
+            return list.sort((a, b) => a.stack.localeCompare(b.stack) || a.name.localeCompare(b.name));
         },
 
         providerSnippet() {
@@ -289,6 +307,7 @@ export default {
 
                 if (res.ok) {
                     this.networks = res.networks;
+                    this.containers = res.containers || [];
                 } else {
                     this.$root.toastRes(res);
                 }
@@ -296,6 +315,10 @@ export default {
         },
 
         onDragStart(event, entry) {
+            if (this.network?.builtIn) {
+                event.preventDefault();
+                return;
+            }
             event.dataTransfer.effectAllowed = "copy";
             event.dataTransfer.setData("text/plain", entry.id);
         },
@@ -319,7 +342,8 @@ export default {
         },
 
         connectContainer(containerId) {
-            if (!this.network || this.network.builtIn || this.busy || !this.availableContainers.some((item) => item.id === containerId)) {
+            if (!this.network || this.network.builtIn || this.busy
+                || !this.availableContainers.some((item) => item.id === containerId || item.id.startsWith(containerId))) {
                 return;
             }
 
@@ -417,52 +441,185 @@ export default {
 <style lang="scss" scoped>
 @import "../../styles/resource-detail.scss";
 
-.relation-grid {
+/* Two compact lists side by side: what can join, and what already did. */
+.rel-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--rd-3);
 
-    @media (max-width: 760px) {
+    @media (max-width: 900px) {
         grid-template-columns: 1fr;
     }
 }
 
-.relation-panel {
-    min-width: 0;
-    padding: var(--rd-4);
+.rel-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
 
-    h3 {
-        margin: 0 0 var(--rd-1);
-        color: var(--strong);
+.rel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rd-2);
+    padding: var(--rd-2) var(--rd-3);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.rel-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--strong);
+    font-weight: 600;
+}
+
+.rel-count {
+    flex: 0 0 auto;
+    color: var(--dim);
+    font-size: var(--rd-fs-small);
+    font-variant-numeric: tabular-nums;
+}
+
+.rel-list {
+    max-height: 300px;
+    min-height: 60px;
+    overflow-y: auto;
+    padding: var(--rd-1);
+}
+
+.rel-item {
+    display: flex;
+    align-items: center;
+    gap: var(--rd-2);
+    padding: 5px var(--rd-2);
+    border-radius: var(--rd-radius-sm);
+    cursor: grab;
+    transition: background 0.1s ease-in-out;
+
+    &:hover {
+        background: var(--panel-bg);
+    }
+
+    &.attached {
+        cursor: default;
+    }
+
+    &.disabled {
+        cursor: not-allowed;
+    }
+
+    &.disabled .rel-grip {
+        opacity: 0.3;
     }
 }
 
-.relation-help, .relation-empty, .relation-warning {
-    font-size: var(--rd-fs-small);
-    color: var(--muted);
+.rel-grip {
+    flex: 0 0 auto;
+    color: var(--dim);
+    font-size: 11px;
 }
 
-.relation-help { margin-bottom: var(--rd-3); }
-.relation-empty { padding: var(--rd-4) 0; }
-.relation-warning { margin: var(--rd-3) 0 0; }
-.relation-target { border: 1px dashed var(--card-border); }
-.relation-target.drag-over { border-color: $primary; background: var(--panel-bg); }
+.rel-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
 
-.relation-container {
-    position: relative;
-    padding: var(--rd-3);
-    margin-top: var(--rd-2);
+.rel-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--strong);
+    font-size: var(--rd-fs-small);
+}
+
+.rel-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: var(--rd-fs-small);
+}
+
+.rel-add {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
     border: 1px solid var(--card-border);
     border-radius: var(--rd-radius-sm);
-    background: var(--panel-bg);
-    cursor: grab;
+    background: transparent;
+    color: var(--muted);
+    font-size: 10px;
+    cursor: pointer;
 
-    &.attached { cursor: default; }
-    .btn { margin-top: var(--rd-2); }
+    &:hover:not(:disabled) {
+        border-color: $primary;
+        color: $primary;
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
 }
 
-.relation-name { font-weight: 600; color: var(--strong); word-break: break-all; }
-.relation-sub { font-size: var(--rd-fs-small); color: var(--muted); word-break: break-all; }
+.rel-empty {
+    padding: var(--rd-4) var(--rd-2);
+    text-align: center;
+    color: var(--dim);
+    font-size: var(--rd-fs-small);
+}
+
+.rel-foot {
+    padding: var(--rd-1) var(--rd-3) var(--rd-2);
+    border-top: 1px solid var(--card-border);
+    color: var(--dim);
+    font-size: var(--rd-fs-small);
+}
+
+.rel-target {
+    border-style: dashed;
+
+    &.drag-over {
+        border-color: $primary;
+        background: var(--panel-bg);
+    }
+}
+
+.dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dim);
+
+    &.on {
+        background: $primary;
+    }
+}
+
+.relation-warning {
+    margin: var(--rd-2) 0 0;
+    color: var(--dim);
+    font-size: var(--rd-fs-small);
+}
+
+.kv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--rd-5);
+
+    @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+    }
+}
 
 .merge-item {
     display: flex;
