@@ -125,11 +125,11 @@ then `systemctl restart docker` and refresh the page. With no mirror configured 
 
 ### Image updates
 
-The last row of the sidebar stack list is "Image updates", which does what watchtower would. It checks by itself whenever a page is opened (at most once a minute); when something is newer the row turns into an orange dot with a count, and clicking it opens the details.
+The last row of the sidebar stack list is an "N image updates available" button, which does what watchtower would. It checks by itself whenever a page is opened (at most once a minute), and the stacks that own such an image get an "Update" tag on their row. With nothing waiting the button is not there at all, and pressing it pulls and recreates straight away - no checkboxes, no confirmation.
 
 - The check asks each registry for the manifest and compares `Docker-Content-Digest` with the local `RepoDigests`. Multi-arch images compare index digests, which is what `docker pull` looks at too.
 - The list covers Dockcg itself plus every image a stack declares. One image used by three stacks is a single row, with the stack names in the note.
-- "Pull and recreate" runs `docker compose pull` + `up -d` for stacks, so containers actually move to the new image. Dockcg itself is pulled and then recreated through the `com.docker.compose.project` label on its own container, which is why the page disconnects briefly.
+- One press starts it: `docker compose pull` + `up -d` for stacks, so containers actually move to the new image. Dockcg itself is pulled and then recreated through the `com.docker.compose.project` label on its own container, which is why the page disconnects briefly. The button reads "Updating" meanwhile and the check runs again afterwards.
 - If Dockcg was started with `docker run` and has no compose labels, the image is only pulled and the page asks you to restart it manually.
 - An image this host never pulled shows "Cannot check": there is no `RepoDigests` to compare. Add the registry below or log in first so the check can authenticate.
 

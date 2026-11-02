@@ -63,6 +63,10 @@
                                     <Uptime :stack="stack" :fixed-width="true" />
                                     <span class="title">{{ stack.name }}</span>
                                 </router-link>
+                                <!-- A stack with a newer image behind one of its
+                                     services says so here, instead of leaving the
+                                     user to open the update list to find out. -->
+                                <span v-if="hasUpdate(stack)" class="upd-tag">{{ $t("stackUpdateTag") }}</span>
                                 <button
                                     v-if="containerCount(stack) > 0"
                                     class="caret" :class="{ open: isOpen(stack) }" type="button"
@@ -122,30 +126,24 @@
                 </template>
             </div>
 
-            <!-- Bottom of the stack list: images with a newer digest waiting.
-                 Checking happens on its own, so this is a status line first and
-                 an entry point second. -->
-            <div v-if="view === 'stacks'" class="panel-foot">
-                <button class="upd-entry" type="button" :title="$t('imageUpdates')" @click="openUpdates">
-                    <span class="upd-dot" :class="updatesState"></span>
-                    <span class="upd-text">{{ updatesText }}</span>
-                    <font-awesome-icon v-if="updates.checking" icon="arrows-rotate" spin class="upd-icon" />
-                    <span v-else-if="updates.outdated > 0" class="upd-count">{{ updates.outdated }}</span>
+            <!-- Bottom of the stack list: nothing to read, nothing to pick.
+                 The button only exists when there is work, and pressing it
+                 pulls and recreates straight away. -->
+            <div v-if="view === 'stacks' && updates.outdated > 0" class="panel-foot">
+                <button class="upd-btn" type="button" :disabled="updates.updating" @click="updateAll">
+                    <font-awesome-icon icon="arrows-rotate" :spin="updates.updating" class="upd-btn-icon" />
+                    <span class="upd-btn-label">
+                        {{ updates.updating ? $t("pullingImages") : $t("imageUpdatesFound", { n: updates.outdated }) }}
+                    </span>
                 </button>
             </div>
         </div>
-
-        <ImageUpdatesDialog
-            ref="updatesDialog" :endpoint="endpoint"
-            @checked="onUpdatesChecked" @updated="onImagesUpdated"
-        />
     </aside>
 </template>
 
 <script>
 import { RUNNING } from "../../../common/util-common";
 import Uptime from "./Uptime.vue";
-import ImageUpdatesDialog from "./resources/ImageUpdatesDialog.vue";
 
 const TABS = [
     { key: "stacks",
@@ -186,7 +184,6 @@ function compareStacks(m1, m2) {
 export default {
     components: {
         Uptime,
-        ImageUpdatesDialog,
     },
 
     props: {
@@ -216,14 +213,13 @@ export default {
             volumes: [],
             networks: [],
             openStacks: {},
-            /** Result of the automatic image check shown in the footer */
+            /** Result of the background image check: only the count is shown */
             updates: {
                 checking: false,
-                checked: false,
+                updating: false,
                 outdated: 0,
-                total: 0,
-                error: "",
                 at: 0,
+                entries: [],
             },
         };
     },
@@ -233,36 +229,18 @@ export default {
             return Object.keys(this.$root.agentList || {}).length > 1;
         },
 
-        updatesState() {
-            if (this.updates.checking) {
-                return "checking";
+        /** Stack names whose image has a newer digest waiting */
+        outdatedStacks() {
+            const names = new Set();
+            for (const entry of this.updates.entries) {
+                if (entry.state !== "outdated") {
+                    continue;
+                }
+                for (const name of entry.stacks || []) {
+                    names.add(name);
+                }
             }
-            if (this.updates.error) {
-                return "error";
-            }
-            if (!this.updates.checked) {
-                return "idle";
-            }
-            return this.updates.outdated > 0 ? "outdated" : "current";
-        },
-
-        updatesText() {
-            if (this.updates.checking && !this.updates.checked) {
-                return this.$t("checkingImageUpdates");
-            }
-            if (this.updates.error) {
-                return this.$t("imageUpdatesCheckFailed");
-            }
-            if (!this.updates.checked) {
-                return this.$t("imageUpdatesCheckNow");
-            }
-            if (this.updates.outdated > 0) {
-                return this.$t("imageUpdatesFound", { n: this.updates.outdated });
-            }
-            if (this.updates.total === 0) {
-                return this.$t("imageUpdatesNothing");
-            }
-            return this.$t("imageUpdatesUpToDate");
+            return names;
         },
 
         endpointLocal: {
@@ -449,39 +427,73 @@ export default {
             }
 
             this.updates.checking = true;
-            this.updates.error = "";
 
             this.$root.emitAgent(this.endpoint, "checkImageUpdates", (res) => {
                 this.onUpdatesChecked(res);
             });
         },
 
-        /** Shared by the automatic check and the dialog's own checks */
+        /**
+         * A failed check is not worth a message: the button simply does not
+         * appear, and the next page change tries again.
+         */
         onUpdatesChecked(res) {
             this.updates.checking = false;
-            this.updates.checked = true;
             this.updates.at = Date.now();
 
-            if (res?.ok) {
-                const entries = res.entries || [];
-                this.updates.total = entries.length;
-                this.updates.outdated = entries.filter((entry) => entry.state === "outdated").length;
-                this.updates.error = "";
-            } else {
-                this.updates.total = 0;
-                this.updates.outdated = 0;
-                this.updates.error = res?.msg || this.$t("unknownError");
+            const entries = res?.ok ? (res.entries || []) : [];
+            this.updates.entries = entries;
+            this.updates.outdated = entries.filter((entry) => entry.state === "outdated").length;
+        },
+
+        hasUpdate(stack) {
+            return this.outdatedStacks.has(stack.name);
+        },
+
+        /**
+         * The button is the whole flow: pull every image that has a newer
+         * digest, recreate what uses it, then look again.
+         */
+        updateAll() {
+            if (this.updates.updating) {
+                return;
             }
-        },
 
-        openUpdates() {
-            this.$refs.updatesDialog?.show();
-        },
+            const images = this.updates.entries
+                .filter((entry) => entry.state === "outdated")
+                .map((entry) => entry.id);
+            if (images.length === 0) {
+                return;
+            }
 
-        /** New images mean new containers: reload the list and the badge */
-        onImagesUpdated() {
-            this.refresh();
-            this.checkUpdates(true);
+            this.updates.updating = true;
+
+            this.$root.emitAgent(this.endpoint, "updateImages", { images }, (res) => {
+                this.updates.updating = false;
+
+                if (!res?.ok) {
+                    this.$root.toastError(res?.msg || this.$t("unknownError"));
+                    return;
+                }
+
+                const needsRestart = (res.skipped || []).some((item) => item.reason === "selfRestartManually");
+                const skipped = (res.skipped || []).filter((item) => item.reason !== "selfRestartManually");
+                const pulled = res.updated || [];
+                let done = this.$t("imageUpdateDone");
+                if (pulled.length > 0) {
+                    done = `${done} (${pulled.length})`;
+                }
+                if (skipped.length > 0) {
+                    done = `${done} · ${this.$t("imageUpdateSkipped")} ${skipped.length}`;
+                }
+                if (needsRestart) {
+                    done = `${done} · ${this.$t("imageSelfNeedsRestart")}`;
+                }
+                this.$root.toastSuccess(done);
+
+                this.refresh();
+                this.checkUpdates(true);
+            });
         },
 
         /** Collapse the list and show one resource list in its place. */
@@ -815,88 +827,75 @@ export default {
     overflow-y: auto;
 }
 
-/* Footer under the stack list: the image check result on a single line */
+/* Footer under the stack list. It only exists while something is waiting, so
+   the button carries the warning colour instead of a status beside it. */
 .panel-foot {
     flex: 0 0 auto;
-    padding: var(--rd-1) var(--rd-2);
+    padding: var(--rd-2);
     border-top: 1px solid var(--card-border);
 }
 
-.upd-entry {
+.upd-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: center;
+    gap: 7px;
     width: 100%;
-    min-height: 32px;
-    padding: 5px 8px;
-    border: 0;
-    border-radius: var(--rd-radius);
-    background: transparent;
-    color: var(--muted);
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba($warning, 0.45);
+    border-radius: var(--rd-radius-sm);
+    background: rgba($warning, 0.1);
+    color: #8a5a00;
     font-size: var(--rd-fs-small);
-    text-align: left;
+    line-height: 1;
     cursor: pointer;
     transition: background 0.15s ease-in-out;
 
-    &:hover {
-        background: $highlight-white;
+    &:hover:not(:disabled) {
+        background: rgba($warning, 0.18);
     }
 
-    .dark &:hover {
-        background: $dark-header-bg;
+    &:disabled {
+        cursor: default;
+        opacity: 0.7;
+    }
+
+    .dark & {
+        color: $warning;
     }
 }
 
-.upd-text {
-    flex: 1 1 auto;
+.upd-btn-icon {
+    flex: 0 0 auto;
+    font-size: 11px;
+    opacity: 0.85;
+}
+
+.upd-btn-label {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.upd-icon {
+/* "Update available" on the stack row itself, so the list answers the
+   question without opening anything. Kept short: the column is narrow. */
+.upd-tag {
     flex: 0 0 auto;
+    margin: 0 2px 0 4px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgba($warning, 0.16);
+    color: #8a5a00;
     font-size: 11px;
-    opacity: 0.7;
-}
+    line-height: 16px;
+    white-space: nowrap;
 
-/* The same 6px dot the container rows use, plus a count when work is waiting */
-.upd-dot {
-    flex: 0 0 auto;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--dim);
-
-    &.current {
-        background: #2ea043;
+    .dark & {
+        color: $warning;
     }
-
-    &.outdated {
-        background: $warning;
-    }
-
-    &.error {
-        background: $danger;
-    }
-
-    &.checking {
-        background: $primary;
-    }
-}
-
-.upd-count {
-    flex: 0 0 auto;
-    min-width: 18px;
-    padding: 0 5px;
-    border-radius: 9px;
-    background: rgba($warning, 0.18);
-    color: $warning;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 17px;
-    text-align: center;
 }
 
 /* Dockge's StackListItem geometry: badge left, name right, one single line.

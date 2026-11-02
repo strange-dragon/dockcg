@@ -1,6 +1,6 @@
 {
     "name": "dockcg",
-    "version": "1.5.13",
+    "version": "1.5.14",
     "type": "module",
     "engines": {
         "node": ">= 22.14.0"
