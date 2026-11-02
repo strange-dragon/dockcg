@@ -1,5 +1,5 @@
 <template>
-    <section class="shadow-box image-updates mb-4">
+    <section class="shadow-box image-updates">
         <div class="iu-header">
             <div class="iu-title">
                 <h2 class="h5">{{ $t("imageUpdates") }}</h2>
@@ -207,6 +207,10 @@ export default {
     margin: 0;
     font-size: 12px;
     color: $dark-font-color3;
+
+    .dark & {
+        color: rgba($dark-font-color, 0.55);
+    }
 }
 
 .iu-error {
@@ -218,6 +222,10 @@ export default {
     padding: 14px 2px 6px;
     font-size: 13px;
     color: $dark-font-color3;
+
+    .dark & {
+        color: rgba($dark-font-color, 0.55);
+    }
 }
 
 .iu-list {

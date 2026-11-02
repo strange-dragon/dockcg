@@ -1,12 +1,14 @@
 <template>
-    <div>
-        <!-- Toolbar -->
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <div class="registries-page">
+        <!-- Page toolbar: same right aligned action row as the other settings pages,
+             with room above it so it does not sit on the page header -->
+        <div class="reg-toolbar">
             <select v-if="hasMultipleEndpoints" v-model="selectedEndpoint" class="form-select registry-endpoint" :aria-label="$t('dockerHost')">
                 <option v-for="(agent, agentEndpoint) in $root.agentList" :key="agentEndpoint" :value="agentEndpoint">
                     {{ agent.name || agent.url || $t("currentEndpoint") }}
                 </option>
             </select>
+
             <button class="btn btn-normal btn-sm" :disabled="loading" @click="loadRegistries">
                 <font-awesome-icon icon="arrows-rotate" :spin="loading" class="me-1" />
                 {{ $t("refresh") }}
@@ -17,19 +19,15 @@
                 {{ $t("reloginAll") }}
             </button>
 
-            <div class="ms-auto">
-                <button v-if="!showForm" class="btn btn-primary btn-sm" @click="showForm = true">
-                    <font-awesome-icon icon="plus" class="me-1" />
-                    {{ $t("addRegistry") }}
-                </button>
-            </div>
+            <button v-if="!showForm" class="btn btn-primary btn-sm" @click="showForm = true">
+                <font-awesome-icon icon="plus" class="me-1" />
+                {{ $t("addRegistry") }}
+            </button>
         </div>
-
-        <p class="page-hint small">{{ $t("registriesHint") }}</p>
 
         <ImageUpdates :endpoint="selectedEndpoint" />
 
-        <section class="shadow-box configured-sources mb-4">
+        <section class="shadow-box configured-sources">
             <h2 class="h5">
                 {{ $t("configuredDockerSources") }}
                 <font-awesome-icon icon="circle-info" class="src-info" :title="$t('configuredSourcesTooltip')" />
@@ -97,7 +95,7 @@
         </section>
 
         <!-- Add / edit form -->
-        <div v-if="showForm" class="shadow-box add-form mb-3">
+        <div v-if="showForm" class="shadow-box add-form">
             <form @submit.prevent="saveRegistry">
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -137,48 +135,51 @@
         </div>
 
         <!-- Saved registries, in the same row language as the stack list -->
-        <div class="src-group-title saved-title">{{ $t("savedRegistries") }}</div>
-        <div class="src-list saved-list">
-            <div v-for="registry in registries" :key="registry.id" class="src-item">
-                <span class="src-mark" :style="{ background: sourceColor(registry.url) }">
-                    <font-awesome-icon v-if="sourceIcon(registry.url)" :icon="['fab', sourceIcon(registry.url)]" />
-                    <template v-else>{{ sourceInitial(registry.url) }}</template>
-                </span>
-                <div class="src-body">
-                    <span class="src-name">{{ registry.name || registry.url }}</span>
-                    <span class="src-meta">
-                        {{ registry.url }}<template v-if="registry.username"> · {{ registry.username }}</template> · {{ formatDate(registry.createdDate) }}
+        <section class="shadow-box saved-registries">
+            <h2 class="h5">{{ $t("savedRegistries") }}</h2>
+            <p class="source-note">{{ $t("registriesHint") }}</p>
+            <div class="src-list">
+                <div v-for="registry in registries" :key="registry.id" class="src-item">
+                    <span class="src-mark" :style="{ background: sourceColor(registry.url) }">
+                        <font-awesome-icon v-if="sourceIcon(registry.url)" :icon="['fab', sourceIcon(registry.url)]" />
+                        <template v-else>{{ sourceInitial(registry.url) }}</template>
                     </span>
+                    <div class="src-body">
+                        <span class="src-name">{{ registry.name || registry.url }}</span>
+                        <span class="src-meta">
+                            {{ registry.url }}<template v-if="registry.username"> · {{ registry.username }}</template> · {{ formatDate(registry.createdDate) }}
+                        </span>
+                    </div>
+                    <div class="src-actions">
+                        <button
+                            class="btn btn-sm btn-normal"
+                            :disabled="syncingId === registry.id"
+                            :title="$t('relogin')"
+                            @click="relogin(registry)"
+                        >
+                            <font-awesome-icon icon="rotate" :spin="syncingId === registry.id" />
+                        </button>
+                        <button class="btn btn-sm btn-normal" :title="$t('Edit')" @click="editRegistry(registry)">
+                            <font-awesome-icon icon="pen" />
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" :title="$t('delete')" @click="askRemove(registry)">
+                            <font-awesome-icon icon="trash" />
+                        </button>
+                    </div>
                 </div>
-                <div class="src-actions">
-                    <button
-                        class="btn btn-sm btn-normal"
-                        :disabled="syncingId === registry.id"
-                        :title="$t('relogin')"
-                        @click="relogin(registry)"
-                    >
-                        <font-awesome-icon icon="rotate" :spin="syncingId === registry.id" />
-                    </button>
-                    <button class="btn btn-sm btn-normal" :title="$t('Edit')" @click="editRegistry(registry)">
-                        <font-awesome-icon icon="pen" />
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" :title="$t('delete')" @click="askRemove(registry)">
-                        <font-awesome-icon icon="trash" />
-                    </button>
+                <div v-if="!loading && registries.length === 0" class="src-item is-empty">
+                    <span class="src-mark is-empty"><font-awesome-icon icon="plus" /></span>
+                    <div class="src-body">
+                        <span class="src-name">{{ $t("registriesEmpty") }}</span>
+                    </div>
+                    <div class="src-actions">
+                        <button class="btn btn-sm btn-normal" type="button" @click="showForm = true">
+                            <font-awesome-icon icon="plus" class="me-1" />{{ $t("addRegistry") }}
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div v-if="!loading && registries.length === 0" class="src-item is-empty">
-                <span class="src-mark is-empty"><font-awesome-icon icon="plus" /></span>
-                <div class="src-body">
-                    <span class="src-name">{{ $t("registriesEmpty") }}</span>
-                </div>
-                <div class="src-actions">
-                    <button class="btn btn-sm btn-normal" type="button" @click="showForm = true">
-                        <font-awesome-icon icon="plus" class="me-1" />{{ $t("addRegistry") }}
-                    </button>
-                </div>
-            </div>
-        </div>
+        </section>
 
         <Confirm ref="confirmRemove" :yes-text="$t('yes')" :no-text="$t('no')" btn-style="btn-danger" @yes="doRemove">
             <p class="mb-1">{{ $t("confirmDeleteRegistry") }}</p>
@@ -530,18 +531,34 @@ export default {
 <style lang="scss" scoped>
 @import "../../styles/vars.scss";
 
-.page-hint {
-    color: #6c757d;
-
-    .dark & {
-        color: rgba($dark-font-color, 0.66);
-    }
+/* The settings header bar sits right above this page, so give it its own top
+   space and one shared gap between cards. Without this the action row reads as
+   part of the header, which is what made the whole page look cramped. */
+.registries-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-top: 16px;
 }
 
-.registry-endpoint { width: auto; min-width: 180px; }
+/* One action row, right aligned, like the other settings pages */
+.reg-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
 
-/* ---- Configured sources ---- */
-.configured-sources {
+.registry-endpoint {
+    width: auto;
+    min-width: 180px;
+    margin-right: auto;
+}
+
+/* ---- Configured sources / saved registries ---- */
+.configured-sources,
+.saved-registries {
     padding: 16px 18px;
 
     h2 {
@@ -589,10 +606,6 @@ export default {
     .dark & {
         color: rgba($dark-font-color, 0.55);
     }
-}
-
-.saved-title {
-    margin-top: 0;
 }
 
 .src-list {
