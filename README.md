@@ -123,6 +123,16 @@ Mirrors work the same way — edit the host's `/etc/docker/daemon.json`:
 
 then `systemctl restart docker` and refresh the page. With no mirror configured the list stays empty and pulls go straight to Docker Hub.
 
+### Image updates
+
+The "Image updates" block at the top of Settings → Registries does what watchtower would:
+
+- "Check for updates" asks each registry for the manifest and compares `Docker-Content-Digest` with the local `RepoDigests`. Multi-arch images compare index digests, which is what `docker pull` looks at too.
+- The list covers Dockcg itself plus every image a stack declares. One image used by three stacks is a single row, with the stack names in the note.
+- "Pull and recreate" runs `docker compose pull` + `up -d` for stacks, so containers actually move to the new image. Dockcg itself is pulled and then recreated through the `com.docker.compose.project` label on its own container, which is why the page disconnects briefly.
+- If Dockcg was started with `docker run` and has no compose labels, the image is only pulled and the page asks you to restart it manually.
+- An image this host never pulled shows "Cannot check": there is no `RepoDigests` to compare. Add the registry below or log in first so the check can authenticate.
+
 ### Upgrade and backup
 
 ```bash

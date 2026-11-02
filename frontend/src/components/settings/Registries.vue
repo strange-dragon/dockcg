@@ -27,6 +27,8 @@
 
         <p class="page-hint small">{{ $t("registriesHint") }}</p>
 
+        <ImageUpdates :endpoint="selectedEndpoint" />
+
         <section class="shadow-box configured-sources mb-4">
             <h2 class="h5">
                 {{ $t("configuredDockerSources") }}
@@ -187,6 +189,7 @@
 
 <script>
 import Confirm from "../Confirm.vue";
+import ImageUpdates from "./ImageUpdates.vue";
 
 /*
  * Every source gets a colour, and the same source always gets the same colour,
@@ -248,6 +251,7 @@ export function sourceHost(value) {
 export default {
     components: {
         Confirm,
+        ImageUpdates,
     },
 
     props: {

@@ -27,6 +27,14 @@ import {
     removeVolume
 } from "../docker-resources";
 import { inspectImage } from "../docker-resource-actions";
+import {
+    checkImageUpdates,
+    collectStackImages,
+    getSelfComposeTarget,
+    getSelfContainer,
+    pullImage,
+    type SelfContainer,
+} from "../image-updates";
 import { log } from "../log";
 import { createContainerComposeDraft } from "../container-compose-draft";
 import { adoptContainerToStack } from "../container-adoption";
@@ -50,6 +58,37 @@ function requireBoolean(value : unknown, fieldName : string) : boolean {
 
 function composeHash(source : string) : string {
     return createHash("sha256").update(source).digest("hex");
+}
+
+/**
+ * Recreate the container Dockcg itself runs in, after its image was pulled.
+ *
+ * The compose project is read back from the container's own labels, so no path
+ * has to be configured. Runs after a short delay: `up -d` replaces this
+ * container, which kills the process before it could answer the request.
+ */
+function recreateSelfLater(self : SelfContainer) {
+    const target = getSelfComposeTarget(self);
+
+    if (!target) {
+        return;
+    }
+
+    setTimeout(() => {
+        const args = [ "compose", "-p", target.project, "--project-directory", path.dirname(target.files[0]) ];
+        for (const file of target.files) {
+            args.push("-f", file);
+        }
+        args.push("up", "-d", "--remove-orphans");
+
+        dockerExec(args).then((res) => {
+            if (res.exitCode !== 0) {
+                log.warn("image-updates", `Failed to recreate Dockcg: ${res.stderr.trim()}`);
+            }
+        }).catch((e) => {
+            log.warn("image-updates", `Failed to recreate Dockcg: ${e instanceof Error ? e.message : String(e)}`);
+        });
+    }, 2000);
 }
 
 /**
@@ -443,6 +482,109 @@ export class DockerResourceSocketHandler extends AgentSocketHandler {
                     plans: plans.map(({ stack, original, updated }) => ({ stack,
                         composeHash: composeHash(original),
                         composeYAML: updated })) }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        // ***************************
+        // Image updates
+        // ***************************
+
+        agentSocket.on("checkImageUpdates", async (callback) => {
+            try {
+                checkLogin(socket);
+                const entries = await checkImageUpdates(server.stacksDir, server.jwtSecret);
+                callbackResult({
+                    ok: true,
+                    entries,
+                }, callback);
+            } catch (e) {
+                callbackError(e, callback);
+            }
+        });
+
+        // Pulls the selected images and recreates whatever runs them, so the
+        // new layer set is actually in use afterwards. Stack updates go through
+        // `docker compose pull && up -d`, which is the same path the stack page
+        // uses; Dockcg's own container has no stack, so it is pulled directly
+        // and recreated through the compose project recorded in its labels.
+        agentSocket.on("updateImages", async (payload : unknown, callback) => {
+            try {
+                checkLogin(socket);
+
+                const data = payload as { images? : unknown };
+                const wanted = Array.isArray(data?.images)
+                    ? data.images.filter((image) : image is string => typeof image === "string" && image.trim() !== "").map((image) => image.trim())
+                    : [];
+
+                if (wanted.length === 0) {
+                    throw new ValidationError("No image selected");
+                }
+
+                const self = await getSelfContainer();
+                const imageToStacks = new Map<string, string[]>();
+                for (const group of collectStackImages(server.stacksDir)) {
+                    imageToStacks.set(group.images[0], group.stacks);
+                }
+
+                const stackList = await Stack.getStackList(server);
+                const updated : string[] = [];
+                const skipped : Array<{ image : string, reason : string }> = [];
+                let selfPending = false;
+
+                for (const image of wanted) {
+                    if (self && image === self.image) {
+                        await pullImage(image);
+                        updated.push(image);
+
+                        if (getSelfComposeTarget(self)) {
+                            selfPending = true;
+                        } else {
+                            skipped.push({
+                                image,
+                                reason: "selfRestartManually",
+                            });
+                        }
+                        continue;
+                    }
+
+                    const stacks = imageToStacks.get(image) || [];
+                    if (stacks.length === 0) {
+                        skipped.push({
+                            image,
+                            reason: "imageNotInStack",
+                        });
+                        continue;
+                    }
+
+                    for (const stackName of stacks) {
+                        const stack = stackList.get(stackName);
+                        if (!stack) {
+                            skipped.push({
+                                image,
+                                reason: "stackNotFound",
+                            });
+                            continue;
+                        }
+
+                        await stack.update(socket);
+                        updated.push(image);
+                    }
+                }
+
+                callbackResult({
+                    ok: true,
+                    updated,
+                    skipped,
+                    selfPending,
+                }, callback);
+
+                // Recreating our own container ends this process, so it happens
+                // only once the response is on the wire.
+                if (selfPending && self) {
+                    recreateSelfLater(self);
+                }
             } catch (e) {
                 callbackError(e, callback);
             }
