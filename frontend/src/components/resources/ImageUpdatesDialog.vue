@@ -8,7 +8,7 @@
                 </div>
                 <div class="modal-body">
                     <ImageUpdates
-                        v-if="opened" ref="panel" :endpoint="endpoint" hide-title
+                        v-if="opened" ref="panel" :endpoint="endpoint" hide-title :auto-check="false"
                         @checked="$emit('checked', $event)" @updated="$emit('updated', $event)"
                     />
                 </div>
@@ -55,7 +55,11 @@ export default {
     methods: {
         show() {
             this.opened = true;
-            this.$nextTick(() => this.modal?.show());
+            // Every open re-checks: what the list showed five minutes ago may be stale
+            this.$nextTick(() => {
+                this.modal?.show();
+                this.$refs.panel?.check();
+            });
         },
 
         hide() {
