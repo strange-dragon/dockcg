@@ -1,8 +1,8 @@
 <template>
-    <section class="shadow-box image-updates">
+    <section class="image-updates">
         <div class="iu-header">
             <div class="iu-title">
-                <h2 class="h5">{{ $t("imageUpdates") }}</h2>
+                <h2 v-if="!hideTitle" class="h5">{{ $t("imageUpdates") }}</h2>
                 <p class="iu-hint">{{ $t("imageUpdatesHint") }}</p>
             </div>
             <button class="btn btn-sm btn-normal" :disabled="checking || updating" @click="check">
@@ -66,7 +66,19 @@ export default {
             type: String,
             default: "",
         },
+        /** The dialog already prints the title in its own header */
+        hideTitle: {
+            type: Boolean,
+            default: false,
+        },
+        /** The sidebar already looked once; opening the dialog should not repeat it */
+        autoCheck: {
+            type: Boolean,
+            default: true,
+        },
     },
+
+    emits: [ "checked", "updated" ],
 
     data() {
         return {
@@ -86,6 +98,12 @@ export default {
         allSelected() {
             return this.selectable.length > 0 && this.selected.length === this.selectable.length;
         },
+    },
+
+    mounted() {
+        if (this.autoCheck) {
+            this.check();
+        }
     },
 
     methods: {
@@ -138,6 +156,12 @@ export default {
                     this.selected = [];
                     this.error = res?.msg || this.$t("unknownError");
                 }
+
+                this.$emit("checked", {
+                    ok: Boolean(res?.ok),
+                    entries: this.entries,
+                    error: this.error,
+                });
             });
         },
 
@@ -171,6 +195,7 @@ export default {
                     done = `${done} · ${this.$t("imageSelfNeedsRestart")}`;
                 }
                 this.$root.toastSuccess(done);
+                this.$emit("updated", pulled);
 
                 this.selected = [];
                 this.check();
@@ -184,7 +209,7 @@ export default {
 @import "../../styles/vars.scss";
 
 .image-updates {
-    padding: 16px 18px;
+    padding: 0;
 }
 
 .iu-header {

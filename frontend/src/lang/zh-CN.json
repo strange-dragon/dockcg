@@ -447,5 +447,10 @@
     "imagesSelected": "已选 {n} 个",
     "imageUpdateDone": "更新完成",
     "imageUpdateSkipped": "跳过",
-    "imageSelfNeedsRestart": "Dockcg 镜像已拉取，重启容器后生效"
+    "imageSelfNeedsRestart": "Dockcg 镜像已拉取，重启容器后生效",
+    "imageUpdatesFound": "{n} 个镜像可更新",
+    "imageUpdatesUpToDate": "镜像均为最新",
+    "imageUpdatesCheckFailed": "镜像检查失败",
+    "imageUpdatesCheckNow": "检查镜像更新",
+    "imageUpdatesNothing": "没有可检查的镜像"
 }

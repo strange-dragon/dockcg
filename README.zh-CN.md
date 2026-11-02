@@ -125,9 +125,9 @@ volumes:
 
 ### 镜像更新
 
-「设置 → 仓库」顶部的「镜像更新」不需要 watchtower：
+侧栏 stacks 列表最底下那行是「镜像更新」，不需要 watchtower。每次打开页面都会自己查一遍（一分钟内不重复查），有更新时显示橙色圆点和数量，点一下打开详情。
 
-- 点「检查更新」，Dockcg 逐个向 registry 请求 manifest，拿 `Docker-Content-Digest` 和本机 `RepoDigests` 比对。多架构镜像比的是 index digest，和 `docker pull` 的判断一致。
+- Dockcg 逐个向 registry 请求 manifest，拿 `Docker-Content-Digest` 和本机 `RepoDigests` 比对。多架构镜像比的是 index digest，和 `docker pull` 的判断一致。
 - 列表里同时有 Dockcg 自身和所有 stacks 声明的镜像。同一个镜像被多个 stack 用只算一行，备注里列出 stack 名。
 - 勾选后「拉取并重建」：stacks 走 `docker compose pull` + `up -d`，容器会换到新镜像上；Dockcg 自身用 `docker pull` 拉取，再读自身容器的 `com.docker.compose.project` 标签重建，所以页面会短暂断开。
 - Dockcg 自身若是 `docker run` 起的、没有 compose 标签，就只拉取，页面会提示手动重启。

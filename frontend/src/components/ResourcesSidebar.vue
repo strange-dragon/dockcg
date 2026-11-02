@@ -121,13 +121,31 @@
                     <div v-else-if="rows.length === 0" class="empty">{{ $t("noResources") }}</div>
                 </template>
             </div>
+
+            <!-- Bottom of the stack list: images with a newer digest waiting.
+                 Checking happens on its own, so this is a status line first and
+                 an entry point second. -->
+            <div v-if="view === 'stacks'" class="panel-foot">
+                <button class="upd-entry" type="button" :title="$t('imageUpdates')" @click="openUpdates">
+                    <span class="upd-dot" :class="updatesState"></span>
+                    <span class="upd-text">{{ updatesText }}</span>
+                    <font-awesome-icon v-if="updates.checking" icon="arrows-rotate" spin class="upd-icon" />
+                    <span v-else-if="updates.outdated > 0" class="upd-count">{{ updates.outdated }}</span>
+                </button>
+            </div>
         </div>
+
+        <ImageUpdatesDialog
+            ref="updatesDialog" :endpoint="endpoint"
+            @checked="onUpdatesChecked" @updated="onImagesUpdated"
+        />
     </aside>
 </template>
 
 <script>
 import { RUNNING } from "../../../common/util-common";
 import Uptime from "./Uptime.vue";
+import ImageUpdatesDialog from "./resources/ImageUpdatesDialog.vue";
 
 const TABS = [
     { key: "stacks",
@@ -139,6 +157,12 @@ const TABS = [
     { key: "networks",
         label: "networks" },
 ];
+
+/**
+ * Digests do not change by the second: one automatic check per minute is
+ * enough, and it keeps navigation from firing a registry request per page.
+ */
+const CHECK_INTERVAL = 60 * 1000;
 
 /** Stacks keep Dockge's ordering: managed first, then running, then by name. */
 function compareStacks(m1, m2) {
@@ -162,6 +186,7 @@ function compareStacks(m1, m2) {
 export default {
     components: {
         Uptime,
+        ImageUpdatesDialog,
     },
 
     props: {
@@ -191,12 +216,53 @@ export default {
             volumes: [],
             networks: [],
             openStacks: {},
+            /** Result of the automatic image check shown in the footer */
+            updates: {
+                checking: false,
+                checked: false,
+                outdated: 0,
+                total: 0,
+                error: "",
+                at: 0,
+            },
         };
     },
 
     computed: {
         hasMultipleEndpoints() {
             return Object.keys(this.$root.agentList || {}).length > 1;
+        },
+
+        updatesState() {
+            if (this.updates.checking) {
+                return "checking";
+            }
+            if (this.updates.error) {
+                return "error";
+            }
+            if (!this.updates.checked) {
+                return "idle";
+            }
+            return this.updates.outdated > 0 ? "outdated" : "current";
+        },
+
+        updatesText() {
+            if (this.updates.checking && !this.updates.checked) {
+                return this.$t("checkingImageUpdates");
+            }
+            if (this.updates.error) {
+                return this.$t("imageUpdatesCheckFailed");
+            }
+            if (!this.updates.checked) {
+                return this.$t("imageUpdatesCheckNow");
+            }
+            if (this.updates.outdated > 0) {
+                return this.$t("imageUpdatesFound", { n: this.updates.outdated });
+            }
+            if (this.updates.total === 0) {
+                return this.$t("imageUpdatesNothing");
+            }
+            return this.$t("imageUpdatesUpToDate");
         },
 
         endpointLocal: {
@@ -336,6 +402,7 @@ export default {
     watch: {
         endpoint() {
             this.refresh();
+            this.checkUpdates(true);
         },
         "$root.agentList"() {
             this.refresh();
@@ -343,10 +410,15 @@ export default {
         "$root.socketIO.connected"(connected) {
             if (connected) {
                 this.refresh();
+                this.checkUpdates(true);
             }
         },
         "$route.params.stackName"() {
             this.expandCurrentStack();
+        },
+        "$route.fullPath"() {
+            // Opening a page is the moment to notice a newer image
+            this.checkUpdates();
         },
     },
 
@@ -354,6 +426,7 @@ export default {
         this.expandCurrentStack();
         this.refresh();
         this.observeHead();
+        this.checkUpdates(true);
     },
 
     beforeUnmount() {
@@ -362,6 +435,55 @@ export default {
     },
 
     methods: {
+        /**
+         * Ask the agent whether any image has a newer digest. This runs by
+         * itself whenever a page is opened; the throttle keeps moving around
+         * the app from hammering every registry on each click.
+         */
+        checkUpdates(force = false) {
+            if (this.updates.checking) {
+                return;
+            }
+            if (!force && Date.now() - this.updates.at < CHECK_INTERVAL) {
+                return;
+            }
+
+            this.updates.checking = true;
+            this.updates.error = "";
+
+            this.$root.emitAgent(this.endpoint, "checkImageUpdates", (res) => {
+                this.onUpdatesChecked(res);
+            });
+        },
+
+        /** Shared by the automatic check and the dialog's own checks */
+        onUpdatesChecked(res) {
+            this.updates.checking = false;
+            this.updates.checked = true;
+            this.updates.at = Date.now();
+
+            if (res?.ok) {
+                const entries = res.entries || [];
+                this.updates.total = entries.length;
+                this.updates.outdated = entries.filter((entry) => entry.state === "outdated").length;
+                this.updates.error = "";
+            } else {
+                this.updates.total = 0;
+                this.updates.outdated = 0;
+                this.updates.error = res?.msg || this.$t("unknownError");
+            }
+        },
+
+        openUpdates() {
+            this.$refs.updatesDialog?.show();
+        },
+
+        /** New images mean new containers: reload the list and the badge */
+        onImagesUpdated() {
+            this.refresh();
+            this.checkUpdates(true);
+        },
+
         /** Collapse the list and show one resource list in its place. */
         setView(view) {
             if (this.view === view) {
@@ -691,6 +813,90 @@ export default {
     min-height: 0;
     padding: var(--rd-1) var(--rd-2) var(--rd-2);
     overflow-y: auto;
+}
+
+/* Footer under the stack list: the image check result on a single line */
+.panel-foot {
+    flex: 0 0 auto;
+    padding: var(--rd-1) var(--rd-2);
+    border-top: 1px solid var(--card-border);
+}
+
+.upd-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: var(--rd-radius);
+    background: transparent;
+    color: var(--muted);
+    font-size: var(--rd-fs-small);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease-in-out;
+
+    &:hover {
+        background: $highlight-white;
+    }
+
+    .dark &:hover {
+        background: $dark-header-bg;
+    }
+}
+
+.upd-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upd-icon {
+    flex: 0 0 auto;
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* The same 6px dot the container rows use, plus a count when work is waiting */
+.upd-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dim);
+
+    &.current {
+        background: #2ea043;
+    }
+
+    &.outdated {
+        background: $warning;
+    }
+
+    &.error {
+        background: $danger;
+    }
+
+    &.checking {
+        background: $primary;
+    }
+}
+
+.upd-count {
+    flex: 0 0 auto;
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: rgba($warning, 0.18);
+    color: $warning;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 17px;
+    text-align: center;
 }
 
 /* Dockge's StackListItem geometry: badge left, name right, one single line.

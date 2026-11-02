@@ -125,9 +125,9 @@ then `systemctl restart docker` and refresh the page. With no mirror configured 
 
 ### Image updates
 
-The "Image updates" block at the top of Settings → Registries does what watchtower would:
+The last row of the sidebar stack list is "Image updates", which does what watchtower would. It checks by itself whenever a page is opened (at most once a minute); when something is newer the row turns into an orange dot with a count, and clicking it opens the details.
 
-- "Check for updates" asks each registry for the manifest and compares `Docker-Content-Digest` with the local `RepoDigests`. Multi-arch images compare index digests, which is what `docker pull` looks at too.
+- The check asks each registry for the manifest and compares `Docker-Content-Digest` with the local `RepoDigests`. Multi-arch images compare index digests, which is what `docker pull` looks at too.
 - The list covers Dockcg itself plus every image a stack declares. One image used by three stacks is a single row, with the stack names in the note.
 - "Pull and recreate" runs `docker compose pull` + `up -d` for stacks, so containers actually move to the new image. Dockcg itself is pulled and then recreated through the `com.docker.compose.project` label on its own container, which is why the page disconnects briefly.
 - If Dockcg was started with `docker run` and has no compose labels, the image is only pulled and the page asks you to restart it manually.

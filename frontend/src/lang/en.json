@@ -447,5 +447,10 @@
     "imagesSelected": "{n} selected",
     "imageUpdateDone": "Update finished",
     "imageUpdateSkipped": "skipped",
-    "imageSelfNeedsRestart": "Dockcg image pulled, restart the container to apply"
+    "imageSelfNeedsRestart": "Dockcg image pulled, restart the container to apply",
+    "imageUpdatesFound": "{n} image updates available",
+    "imageUpdatesUpToDate": "All images up to date",
+    "imageUpdatesCheckFailed": "Image check failed",
+    "imageUpdatesCheckNow": "Check image updates",
+    "imageUpdatesNothing": "No images to check"
 }
